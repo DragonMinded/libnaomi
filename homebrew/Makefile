@@ -1,4 +1,4 @@
-all: pyenv libnaomi libnaomimessage examples tests
+all: pyenv libnaomi libnaomimessage libnaomisprite examples tests
 
 ${NAOMI_BASE}/tools/pyenv:
 	mkdir -p ${NAOMI_BASE}/tools
@@ -17,16 +17,20 @@ libnaomi:
 libnaomimessage:
 	$(MAKE) -C libnaomi/message
 
+.PHONY: libnaomisprite
+libnaomisprite:
+	$(MAKE) -C libnaomi/sprite
+
 .PHONY: examples
-examples: libnaomi libnaomimessage
+examples: libnaomi libnaomimessage libnaomisprite
 	$(MAKE) -C examples
 
 .PHONY: tests
-tests: libnaomi libnaomimessage
+tests: libnaomi libnaomimessage libnaomisprite
 	$(MAKE) -C tests
 
 .PHONY: copy
-copy: libnaomi libnaomimessage examples
+copy: libnaomi libnaomimessage libnaomisprite examples
 	$(MAKE) -C examples copy
 
 .PHONY: wipe-install-venv
@@ -38,9 +42,10 @@ wipe-install-venv:
 	cd ../ && ${NAOMI_BASE}/tools/pyenv/bin/python3 -m pip install --no-warn-conflicts .
 
 .PHONY: install
-install: libnaomi libnaomimessage wipe-install-venv
+install: libnaomi libnaomimessage libnaomisprite wipe-install-venv
 	$(MAKE) -C libnaomi install
 	$(MAKE) -C libnaomi/message install
+	$(MAKE) -C libnaomi/sprite install
 	mkdir -p ${NAOMI_BASE}/tools
 	cp naomi.ld ${NAOMI_BASE}/tools
 	cp aica.ld ${NAOMI_BASE}/tools
@@ -52,5 +57,6 @@ install: libnaomi libnaomimessage wipe-install-venv
 clean:
 	$(MAKE) -C libnaomi clean
 	$(MAKE) -C libnaomi/message clean
+	$(MAKE) -C libnaomi/sprite clean
 	$(MAKE) -C examples clean
 	$(MAKE) -C tests clean

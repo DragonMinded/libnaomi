@@ -222,7 +222,7 @@ build/%.bin: build/%.elf
 # A rule for how we go about building the elf file from objects.
 build/%.elf: ${OBJS} ${LIBNAOMILOC}
 	@mkdir -p $(dir $@)
-	${LD} -defsym START_ADDR=${START_ADDR} -o $@ $^ ${LIBNAOMI} ${LIBS} ${BASELIBS}
+	${LD} -defsym START_ADDR=${START_ADDR} -o $@ ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group
 
 # A rule for how to build assembly files. Depends on the build dir being created.
 # This runs the C preprocessor for convenience, so you can #define registers and

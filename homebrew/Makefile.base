@@ -64,6 +64,8 @@ NAOMI_SH_LDLIBPATHS  = -L${NAOMI_SH_BASE}/sh-elf/lib/ -L${NAOMI_SH_BASE}/lib/ -L
 NAOMI_SH_LDLIBPATHS += -L$(dir $(abspath $(lastword $(MAKEFILE_LIST))))libnaomi/
 # Add the path to libnaomimessage, built in this repository.
 NAOMI_SH_LDLIBPATHS += -L$(dir $(abspath $(lastword $(MAKEFILE_LIST))))libnaomi/message/
+# Add the path to libnaomisprite, built in this repository.
+NAOMI_SH_LDLIBPATHS += -L$(dir $(abspath $(lastword $(MAKEFILE_LIST))))libnaomi/sprite/
 
 # SH-4 little endian ELF format.
 NAOMI_SH_LDFLAGS  = -mshlelf
@@ -230,7 +232,7 @@ build/%.bin: build/%.elf
 # A rule for how we go about building the elf file from objects.
 build/%.elf: ${OBJS} ${LIBNAOMILOC}
 	@mkdir -p $(dir $@)
-	${LD} -defsym START_ADDR=${START_ADDR} -o $@ $^ ${LIBNAOMI} ${LIBS} ${BASELIBS}
+	${LD} -defsym START_ADDR=${START_ADDR} -o $@ ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group
 
 # A rule for how to build assembly files. Depends on the build dir being created.
 # This runs the C preprocessor for convenience, so you can #define registers and
