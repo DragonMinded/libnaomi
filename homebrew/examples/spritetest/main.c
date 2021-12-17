@@ -35,13 +35,22 @@ void main()
     font_set_size(font, 12);
 #endif
 
-    /* Load our crate texture into VRAM. */
+    /* Load our crate texture into VRAM. Note that the image is purposefully square and a multiple
+     * of 2 with a minimum value of 8x8. */
     extern uint8_t *crate_png_data;
     extern unsigned int crate_png_width;
-#if DISPLAY_GUIDEBOXES
     extern unsigned int crate_png_height;
-#endif
     texture_description_t *crate = ta_texture_desc_malloc_direct(crate_png_width, crate_png_data, TA_TEXTUREMODE_ARGB4444);
+
+    /* Load our sonic texture into VRAM. Note that the larger side needs to be a multiple of 2
+     * and at least 8 pixels long, so we round up (wasteful to VRAM, but shows how to do this). */
+    extern uint8_t *sonic_png_data;
+    extern unsigned int sonic_png_width;
+    extern unsigned int sonic_png_height;
+    unsigned int uvsize = ta_round_uvsize(sonic_png_width > sonic_png_height ? sonic_png_width : sonic_png_height);
+    void *sonicvram = ta_texture_malloc(uvsize, 16);
+    ta_texture_load_sprite(sonicvram, uvsize, 16, 0, 0, sonic_png_width, sonic_png_height, sonic_png_data);
+    texture_description_t *sonic = ta_texture_desc_direct(sonicvram, uvsize, TA_TEXTUREMODE_ARGB4444);
 
     /* Display sprite demo. */
     int tickcount = 0;
@@ -67,6 +76,22 @@ void main()
 
         draw_guidebox(389, 63, 389 + WPAD, 63 + HPAD, rgb(255, 255, 255));
         sprite_draw_rotated(390, 64, tickcount % 360, crate);
+
+        /* Odd shaped (non-square) sprites. */
+        draw_text(64, 138, font, rgb(255, 255, 255), "Odd-shaped (non-square) sprites,\nnormal and rotated:");
+
+        /* Simple odd sprite */
+        sprite_draw_nonsquare(64, 172, sonic_png_width, sonic_png_height, sonic);
+
+        /* Rotated odd sprite */
+        sprite_draw_rotated_nonsquare(150, 172, sonic_png_width, sonic_png_height, 360 - (tickcount % 360), sonic);
+
+        /* Transparency example */
+        draw_text(280, 146, font, rgb(255, 255, 255), "Proper alpha blending:");
+
+        /* Draw two sprites overlappint */
+        sprite_draw_simple(280, 172 + sonic_png_height - crate_png_height, crate);
+        sprite_draw_nonsquare(295, 172, sonic_png_width, sonic_png_height, sonic);
 
         /* Mark the end of the command list */
         ta_commit_end();

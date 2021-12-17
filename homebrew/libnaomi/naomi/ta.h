@@ -350,6 +350,9 @@ void ta_texture_free(void *texture);
 // Get statistics about the allocations in texture memory.
 struct mallinfo ta_texture_mallinfo();
 
+// Round a texture width or height to the next power of two.
+int ta_round_uvsize(int uvsize);
+
 // Given a raw offset into texture RAM (returned by ta_texture_malloc() or calculated by
 // your own manual layout calculations) and a texture size, load the texture into texture
 // RAM in twiddled format required by several video modes. Note that the texture size is

@@ -11,6 +11,7 @@ all: spritetest.bin
 SRCS += main.c
 SRCS += dejavusans.ttf
 SRCS += build/crate.o
+SRCS += build/sonic.o
 
 # Pick up base makefile rules common to all examples.
 include ../../Makefile.base

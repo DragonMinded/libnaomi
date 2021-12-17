@@ -58,14 +58,14 @@ NAOMI_SH_CPPFLAGS += -g
 # Set up gcc default options for compiling .cpp files.
 CPP  = ${NAOMI_SH_CPP} ${NAOMI_SH_CPPFLAGS}
 
-# Set up the libraries we care about.
-NAOMI_SH_LDLIBPATHS  = -L${NAOMI_SH_BASE}/sh-elf/lib/ -L${NAOMI_SH_BASE}/lib/ -L${NAOMI_SH_BASE}/lib/gcc/sh-elf/${NAOMI_SH_GCC_VER}/
 # Add the path to libnaomi, built in this repository.
-NAOMI_SH_LDLIBPATHS += -L$(dir $(abspath $(lastword $(MAKEFILE_LIST))))libnaomi/
+NAOMI_SH_LDLIBPATHS  = -L$(dir $(abspath $(lastword $(MAKEFILE_LIST))))libnaomi/
 # Add the path to libnaomimessage, built in this repository.
 NAOMI_SH_LDLIBPATHS += -L$(dir $(abspath $(lastword $(MAKEFILE_LIST))))libnaomi/message/
 # Add the path to libnaomisprite, built in this repository.
 NAOMI_SH_LDLIBPATHS += -L$(dir $(abspath $(lastword $(MAKEFILE_LIST))))libnaomi/sprite/
+# Set up the libraries we care about.
+NAOMI_SH_LDLIBPATHS += -L${NAOMI_SH_BASE}/sh-elf/lib/ -L${NAOMI_SH_BASE}/lib/ -L${NAOMI_SH_BASE}/lib/gcc/sh-elf/${NAOMI_SH_GCC_VER}/
 
 # SH-4 little endian ELF format.
 NAOMI_SH_LDFLAGS  = -mshlelf

@@ -702,6 +702,27 @@ void *ta_texture_base()
     return ta_working_buffers.texture_ram;
 }
 
+int ta_round_uvsize(int uvsize)
+{
+    int roundsize = 1;
+    while (uvsize)
+    {
+        roundsize <<= 1;
+        uvsize >>= 1;
+    }
+
+    if (roundsize < 8)
+    {
+        roundsize = 8;
+    }
+    if (roundsize > 1024)
+    {
+        roundsize = 1024;
+    }
+
+    return roundsize;
+}
+
 uint32_t _ta_texture_desc_uvsize(int uvsize)
 {
     switch(uvsize)

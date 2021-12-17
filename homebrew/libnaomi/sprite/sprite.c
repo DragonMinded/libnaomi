@@ -56,3 +56,41 @@ void sprite_draw_rotated(int x, int y, float angle, texture_description_t *textu
     /* Draw the sprite to the screen. */
     ta_draw_quad(TA_CMD_POLYGON_TYPE_TRANSPARENT, sprite, texture);
 }
+
+void sprite_draw_nonsquare(int x, int y, int width, int height, texture_description_t *texture)
+{
+    /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
+     * on the screen. */
+    textured_vertex_t sprite[4] = {
+        { (float)x, (float)(y + height), 1.0, 0.0, (float)height / (float)texture->height },
+        { (float)x, (float)y, 1.0, 0.0, 0.0 },
+        { (float)(x + width), (float)y, 1.0, (float)width / (float)texture->width, 0.0 },
+        { (float)(x + width), (float)(y + height), 1.0, (float)width / (float)texture->width, (float)height / (float)texture->height }
+    };
+
+    /* Draw the sprite to the screen. */
+    ta_draw_quad(TA_CMD_POLYGON_TYPE_TRANSPARENT, sprite, texture);
+}
+
+void sprite_draw_rotated_nonsquare(int x, int y, int width, int height, float angle, texture_description_t *texture)
+{
+    /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
+     * on the screen. */
+    textured_vertex_t sprite[4] = {
+        { (float)x, (float)(y + height), 1.0, 0.0, (float)height / (float)texture->height },
+        { (float)x, (float)y, 1.0, 0.0, 0.0 },
+        { (float)(x + width), (float)y, 1.0, (float)width / (float)texture->width, 0.0 },
+        { (float)(x + width), (float)(y + height), 1.0, (float)width / (float)texture->width, (float)height / (float)texture->height }
+    };
+    vertex_t origin = { (float)x + ((float)width / 2.0), (float)y + ((float)height / 2.0), 0.0 };
+
+    /* Rotate the sprite based around its center point. */
+    matrix_push();
+    matrix_init_identity();
+    matrix_rotate_origin_z(&origin, angle);
+    matrix_affine_transform_textured_vertex(sprite, sprite, 4);
+    matrix_pop();
+
+    /* Draw the sprite to the screen. */
+    ta_draw_quad(TA_CMD_POLYGON_TYPE_TRANSPARENT, sprite, texture);
+}
