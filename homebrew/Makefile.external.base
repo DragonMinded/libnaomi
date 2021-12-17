@@ -159,10 +159,8 @@ BASELIBS = -lc -lm -lgcc -lstdc++
 
 ifeq ($(BARE_METAL), 1)
 LIBNAOMI =
-LIBNAOMILOC =
 else
 LIBNAOMI = -lnaomi
-LIBNAOMILOC = ${NAOMI_SH_BASE}/lib/libnaomi.a
 endif
 
 # A List of source files that should be included.
@@ -199,6 +197,10 @@ OBJS = $(patsubst %.raw, build/%.o, $(patsubst %.ttf, build/%.o, $(patsubst %.cp
 # Any extra defines we want available to all homebrew programs.
 EXTRA_DEFINES = -DSERIAL=\"${SERIAL}\" -DBUILD_DATE=$(shell ${DATE}) -DSTART_ADDR=${START_ADDR}
 
+# A trick to gather up all library dependencies so we can recompile if they change.
+LIBDEPS_FILE = ${NAOMI_BASE}/tools/libdeps.py
+LIBDEPS = $(shell ${VENV_PYTHON3} ${LIBDEPS_FILE} ${LD} ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group)
+
 # Feature flags for 3rd party libraries.
 ifeq ($(call libmissing,freetype), 0)
 EXTRA_DEFINES += -DFEATURE_FREETYPE=1
@@ -220,7 +222,8 @@ build/%.bin: build/%.elf
 	${OBJCOPY} $< $@ -O binary
 
 # A rule for how we go about building the elf file from objects.
-build/%.elf: ${OBJS} ${LIBNAOMILOC}
+.SECONDEXPANSION:
+build/%.elf: ${OBJS} $${LIBDEPS}
 	@mkdir -p $(dir $@)
 	${LD} -defsym START_ADDR=${START_ADDR} -o $@ ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group
 

@@ -169,10 +169,8 @@ BASELIBS = -lc -lm -lgcc -lstdc++
 
 ifeq ($(BARE_METAL), 1)
 LIBNAOMI =
-LIBNAOMILOC =
 else
 LIBNAOMI = -lnaomi
-LIBNAOMILOC = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))libnaomi/libnaomi.a
 endif
 
 # A List of source files that should be included.
@@ -224,13 +222,18 @@ else
 FEATURE_ZLIB = 0
 endif
 
+# A trick to gather up all library dependencies so we can recompile if they change.
+LIBDEPS_FILE = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))tools/libdeps.py
+LIBDEPS = $(shell ${VENV_PYTHON3} ${LIBDEPS_FILE} ${LD} ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group)
+
 # A rule for how we go from the final built elf file to a raw binary for extracting.
 build/%.bin: build/%.elf
 	@mkdir -p $(dir $@)
 	${OBJCOPY} $< $@ -O binary
 
 # A rule for how we go about building the elf file from objects.
-build/%.elf: ${OBJS} ${LIBNAOMILOC}
+.SECONDEXPANSION:
+build/%.elf: ${OBJS} $${LIBDEPS}
 	@mkdir -p $(dir $@)
 	${LD} -defsym START_ADDR=${START_ADDR} -o $@ ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group
 
