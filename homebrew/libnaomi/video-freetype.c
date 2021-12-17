@@ -15,6 +15,11 @@
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
+void __video_font_cache_discard()
+{
+    // We don't need to do anything here at the moment.
+}
+
 font_cache_entry_t *__video_cache_create(uint32_t index, int advancex, int advancey, int bitmap_left, int bitmap_top, int width, int height, int mode, uint8_t *buffer)
 {
     font_cache_entry_t *entry = malloc(sizeof(font_cache_entry_t));

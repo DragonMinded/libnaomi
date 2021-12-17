@@ -107,8 +107,20 @@ int font_add_fallback(font_t *font, void *buffer, unsigned int size)
     return -1;
 }
 
+// Prototypes for various font rendering systems that might need to do
+// some cleanup. This is the best I could come up with, unfortunately,
+// and still keep things simple.
+void __video_font_cache_discard();
+void __ta_font_cache_discard();
+
 void _font_cache_discard(font_t *fontface)
 {
+    // Ask the various subsystems that use us to do any discarding
+    // that they might need to do.
+    __video_font_cache_discard();
+    __ta_font_cache_discard();
+
+    // Discard each entry that exists, reset the location back to zero.
     for (int i = 0; i < fontface->cacheloc; i++)
     {
         free(((font_cache_entry_t *)fontface->cache[i])->data);

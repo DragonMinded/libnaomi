@@ -31,6 +31,33 @@ void *curtex = 0;
 static int uloc = 0;
 static int vloc = 0;
 static int vsize = -1;
+static void **allocated_textures = 0;
+static int num_allocated_textures = 0;
+
+void __ta_font_cache_discard()
+{
+    // We've been instructed to kill off the font cache. So, free all the texture
+    // sheets that we allocated.
+    if (allocated_textures)
+    {
+        for (int i = 0; i < num_allocated_textures; i++)
+        {
+            if (allocated_textures[i])
+            {
+                ta_texture_free(allocated_textures[i]);
+            }
+        }
+
+        free(allocated_textures);
+        allocated_textures = 0;
+    }
+
+    num_allocated_textures = 0;
+    curtex = 0;
+    uloc = 0;
+    vloc = 0;
+    vsize = -1;
+}
 
 font_cache_entry_t *_ta_cache_create(uint32_t index, int advancex, int advancey, int bitmap_left, int bitmap_top, int width, int height, int mode, uint8_t *buffer)
 {
@@ -68,6 +95,43 @@ font_cache_entry_t *_ta_cache_create(uint32_t index, int advancex, int advancey,
                 free(entry->data);
                 free(entry);
                 return 0;
+            }
+
+            // Remember we allocated this so we can kill it when the time comes.
+            if (num_allocated_textures == 0)
+            {
+                allocated_textures = malloc(sizeof(void *));
+                if (allocated_textures == 0)
+                {
+                    ta_texture_free(curtex);
+                    free(entry->data);
+                    free(entry);
+                    curtex = 0;
+                    return 0;
+                }
+                else
+                {
+                    num_allocated_textures = 1;
+                    allocated_textures[0] = curtex;
+                }
+            }
+            else
+            {
+                void ** new_allocated_textures = realloc(allocated_textures, sizeof(void *) * (num_allocated_textures + 1));
+                if (new_allocated_textures == 0)
+                {
+                    ta_texture_free(curtex);
+                    free(entry->data);
+                    free(entry);
+                    curtex = 0;
+                    return 0;
+                }
+                else
+                {
+                    allocated_textures = new_allocated_textures;
+                    allocated_textures[num_allocated_textures] = curtex;
+                    num_allocated_textures ++;
+                }
             }
 
             uloc = 0;
