@@ -12,6 +12,8 @@ SRCS += main.c
 SRCS += dejavusans.ttf
 SRCS += build/crate.o
 SRCS += build/sonic.o
+SRCS += build/arrowlt.o
+SRCS += build/arrowrt.o
 
 # These are from https://laredgames.itch.io/gems-coins-free which
 # I purchased to have some good sprites for this demo.
