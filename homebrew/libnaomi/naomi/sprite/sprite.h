@@ -52,6 +52,16 @@ void sprite_draw_simple(int x, int y, texture_description_t *texture);
 // this is monitor orientation aware.
 void sprite_draw_rotated(int x, int y, float angle, texture_description_t *texture);
 
+// Given an X any Y pixel location on the screen as well as an x and y scaling
+// factor, draw that texture as a sprite scaled horizontally and vertically
+// according to the scale factors. The sprite is drawn with its upper corner
+// at the x, y coordinates requested, so the scaling happens downward and
+// rightward. Note that you can use a negative scaling value to flip the sprite
+// in the x or y axis. The sprite is still drawn in the same location but the
+// pixels will be mirrored as requested. Note that this is monitor orientation
+// aware.
+void sprite_draw_scaled(int x, int y, float xscale, float yscale, texture_description_t *texture);
+
 // Given an X and Y pixel location on the screen (based on the top left of the
 // screen), a sprite width and height and a previously loaded texture, draw that
 // texture as a sprite with no scaling or rotation. The sprite is drawn with its

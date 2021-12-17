@@ -57,6 +57,48 @@ void sprite_draw_rotated(int x, int y, float angle, texture_description_t *textu
     ta_draw_quad(TA_CMD_POLYGON_TYPE_TRANSPARENT, sprite, texture);
 }
 
+void sprite_draw_scaled(int x, int y, float xscale, float yscale, texture_description_t *texture)
+{
+    /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
+     * on the screen. */
+    float ulow;
+    float vlow;
+    float uhigh;
+    float vhigh;
+    if (xscale < 0.0)
+    {
+        ulow = 1.0;
+        uhigh = 0.0;
+        xscale = -xscale;
+    }
+    else
+    {
+        ulow = 0.0;
+        uhigh = 1.0;
+    }
+    if (yscale < 0.0)
+    {
+        vlow = 1.0;
+        vhigh = 0.0;
+        yscale = -yscale;
+    }
+    else
+    {
+        vlow = 0.0;
+        vhigh = 1.0;
+    }
+
+    textured_vertex_t sprite[4] = {
+        { (float)x, (float)y + ((float)texture->height * yscale), 1.0, ulow, vhigh },
+        { (float)x, (float)y, 1.0, ulow, vlow },
+        { (float)x + ((float)texture->width * xscale), (float)y, 1.0, uhigh, vlow },
+        { (float)x + ((float)texture->width * xscale), (float)y + ((float)texture->height * yscale), 1.0, uhigh, vhigh }
+    };
+
+    /* Draw the sprite to the screen. */
+    ta_draw_quad(TA_CMD_POLYGON_TYPE_TRANSPARENT, sprite, texture);
+}
+
 void sprite_draw_nonsquare(int x, int y, int width, int height, texture_description_t *texture)
 {
     /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized

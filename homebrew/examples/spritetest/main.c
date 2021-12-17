@@ -10,7 +10,7 @@
 #define draw_text video_draw_text
 #endif
 
-#define MAXPAGES 1
+#define MAXPAGES 2
 
 #define WPAD (crate_png_width + 2)
 #define HPAD (crate_png_height + 2)
@@ -43,6 +43,11 @@ void main()
     extern unsigned int crate_png_width;
     extern unsigned int crate_png_height;
     texture_description_t *crate = ta_texture_desc_malloc_direct(crate_png_width, crate_png_data, TA_TEXTUREMODE_ARGB4444);
+
+    /* Load our diagonal texture into VRAM. */
+    extern uint8_t *diagonal_png_data;
+    extern unsigned int diagonal_png_width;
+    texture_description_t *diagonal = ta_texture_desc_malloc_direct(diagonal_png_width, diagonal_png_data, TA_TEXTUREMODE_ARGB4444);
 
     /* Load our sonic texture into VRAM. Note that the larger side needs to be a multiple of 2
      * and at least 8 pixels long, so we round up (wasteful to VRAM, but shows how to do this). */
@@ -148,6 +153,25 @@ void main()
                 sprite_draw_tilemap_entry_rotated(260, 288, 32, ((tickcount / 15) % 4) + 8, (tickcount * 9) % 360 + 120, color_gems);
                 sprite_draw_tilemap_entry_rotated(300, 288, 32, ((tickcount / 15) % 4) + 12, (tickcount * 9) % 360 + 180, color_gems);
                 sprite_draw_tilemap_entry_rotated(340, 288, 32, (tickcount / 15) % 4, (tickcount * 9) % 360 + 240, gray_gem);
+
+                break;
+            }
+            case 1:
+            {
+                /* Sprites using scaling to flip one or more axis. */
+                draw_text(64, 46, font, rgb(255, 255, 255), "Using scaling to mirror sprites:");
+
+                /* Mirrored in neither, then x, then y, then both x and y. */
+                sprite_draw_scaled(64, 64, 1.0, 1.0, diagonal);
+                sprite_draw_scaled(64 + 40, 64, -1.0, 1.0, diagonal);
+                sprite_draw_scaled(64 + 80, 64, 1.0, -1.0, diagonal);
+                sprite_draw_scaled(64 + 120, 64, -1.0, -1.0, diagonal);
+
+                /* Sprites that scale normally. */
+                draw_text(300, 46, font, rgb(255, 255, 255), "Normal scaling of sprites:");
+                sprite_draw_scaled(300, 64, 1.0, 2.0, diagonal);
+                sprite_draw_scaled(300 + 40, 64, 2.0, 1.0, diagonal);
+                sprite_draw_scaled(300 + 120, 64, 2.0, 2.0, diagonal);
 
                 break;
             }
