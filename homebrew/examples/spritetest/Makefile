@@ -13,6 +13,12 @@ SRCS += dejavusans.ttf
 SRCS += build/crate.o
 SRCS += build/sonic.o
 
+# These are from https://laredgames.itch.io/gems-coins-free which
+# I purchased to have some good sprites for this demo.
+SRCS += build/coins.o
+SRCS += build/color_gems.o
+SRCS += build/gray_gem.o
+
 # Pick up base makefile rules common to all examples.
 include ../../Makefile.base
 

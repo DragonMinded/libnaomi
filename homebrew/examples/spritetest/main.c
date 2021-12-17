@@ -52,6 +52,17 @@ void main()
     ta_texture_load_sprite(sonicvram, uvsize, 16, 0, 0, sonic_png_width, sonic_png_height, sonic_png_data);
     texture_description_t *sonic = ta_texture_desc_direct(sonicvram, uvsize, TA_TEXTUREMODE_ARGB4444);
 
+    /* Load our sprite sheets for a few simple animations. */
+    extern uint8_t *coins_png_data;
+    extern unsigned int coins_png_width;
+    texture_description_t *coins = ta_texture_desc_malloc_direct(coins_png_width, coins_png_data, TA_TEXTUREMODE_ARGB4444);
+    extern uint8_t *color_gems_png_data;
+    extern unsigned int color_gems_png_width;
+    texture_description_t *color_gems = ta_texture_desc_malloc_direct(color_gems_png_width, color_gems_png_data, TA_TEXTUREMODE_ARGB4444);
+    extern uint8_t *gray_gem_png_data;
+    extern unsigned int gray_gem_png_width;
+    texture_description_t *gray_gem = ta_texture_desc_malloc_direct(gray_gem_png_width, gray_gem_png_data, TA_TEXTUREMODE_ARGB4444);
+
     /* Display sprite demo. */
     int tickcount = 0;
     while (1)
@@ -84,7 +95,7 @@ void main()
         sprite_draw_nonsquare(64, 172, sonic_png_width, sonic_png_height, sonic);
 
         /* Rotated odd sprite */
-        sprite_draw_rotated_nonsquare(150, 172, sonic_png_width, sonic_png_height, 360 - (tickcount % 360), sonic);
+        sprite_draw_nonsquare_rotated(150, 172, sonic_png_width, sonic_png_height, 360 - (tickcount % 360), sonic);
 
         /* Transparency example */
         draw_text(280, 146, font, rgb(255, 255, 255), "Proper alpha blending:");
@@ -92,6 +103,21 @@ void main()
         /* Draw two sprites overlappint */
         sprite_draw_simple(280, 172 + sonic_png_height - crate_png_height, crate);
         sprite_draw_nonsquare(295, 172, sonic_png_width, sonic_png_height, sonic);
+
+        /* Tilemaps (easy animation, 2D maps, etc). */
+        draw_text(64, 270, font, rgb(255, 255, 255), "Tilemap support, both normal and rotated:");
+
+        /* Draw animated coins, with full animation cycle every 30 frames. */
+        sprite_draw_tilemap_entry(64, 288, 32, (tickcount / 6) % 5, coins);
+        sprite_draw_tilemap_entry(100, 288, 32, (((tickcount / 6) + 1) % 5) + 5, coins);
+        sprite_draw_tilemap_entry(134, 288, 32, (((tickcount / 6) + 3) % 5) + 10, coins);
+
+        /* Draw animated gems, with full cycle animation cycle every 60 frames. */
+        sprite_draw_tilemap_entry_rotated(180, 288, 32, (tickcount / 15) % 4, (tickcount * 9) % 360, color_gems);
+        sprite_draw_tilemap_entry_rotated(220, 288, 32, ((tickcount / 15) % 4) + 4, (tickcount * 9) % 360 + 60, color_gems);
+        sprite_draw_tilemap_entry_rotated(260, 288, 32, ((tickcount / 15) % 4) + 8, (tickcount * 9) % 360 + 120, color_gems);
+        sprite_draw_tilemap_entry_rotated(300, 288, 32, ((tickcount / 15) % 4) + 12, (tickcount * 9) % 360 + 180, color_gems);
+        sprite_draw_tilemap_entry_rotated(340, 288, 32, (tickcount / 15) % 4, (tickcount * 9) % 360 + 240, gray_gem);
 
         /* Mark the end of the command list */
         ta_commit_end();

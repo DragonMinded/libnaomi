@@ -41,7 +41,7 @@ void sprite_draw_box(int x0, int y0, int x1, int y1, color_t color);
 // the x, y coordinates requested. Note that this is monitor orientation aware.
 void sprite_draw_simple(int x, int y, texture_description_t *texture);
 
-// Given an Y and Y pixel location on the screen, an angle in degrees and a
+// Given an X and Y pixel location on the screen, an angle in degrees and a
 // previously loaded texture, draw that texture as a sprite on the screen,
 // rotated about its center. Note that if you give this function an angle of
 // 0 it will display identically to sprite_draw_simple(). If you are
@@ -60,13 +60,30 @@ void sprite_draw_rotated(int x, int y, float angle, texture_description_t *textu
 // aware.
 void sprite_draw_nonsquare(int x, int y, int width, int height, texture_description_t *texture);
 
-// Given an Y and Y pixel location on the screen, a sprite width and height,
+// Given an X and Y pixel location on the screen, a sprite width and height,
 // an angle in degrees and a previously loaded texture, draw that texture as
 // a sprite on the screen, rotated about its center. The sprite is drawn at
 // the position where if it was rotated at 0 degrees, the x, y coordinates
 // requested would be the top left of the sprite. Note that this is monitor
 // orientation aware.
-void sprite_draw_rotated_nonsquare(int x, int y, int width, int height, float angle, texture_description_t *texture);
+void sprite_draw_nonsquare_rotated(int x, int y, int width, int height, float angle, texture_description_t *texture);
+
+// Given an X and Y pixel location on the screen, the size of each tile entry
+// in the tilemap in pixels (both directions, so the tile must be square) and
+// which tile to draw (starting with the top left as tile 0, increasing left
+// to right and then top to bottom), draw that sprite out of the tilemap. The
+// sprite is drawn with the top left pixel at X, Y. Note that this is monitor
+// orientation aware.
+void sprite_draw_tilemap_entry(int x, int y, int tilesize, int which, texture_description_t *texture);
+
+// Given an X and Y pixel location on the screen, the size of each tile entry
+// in the tilemap in pixels (both directions, so the tile must be square) and
+// which tile to draw (starting with the top left as tile 0, increasing left
+// to right and then top to bottom), draw that sprite out of the tilemap,
+// rotated about its center. The sprite is drawn in the position where if it
+// was rotated 0 degrees, the x, y coordinates requested would be the top left
+// of the sprite. Note that this is monitor orientation aware.
+void sprite_draw_tilemap_entry_rotated(int x, int y, int tilesize, int which, float angle, texture_description_t *texture);
 
 #ifdef __cplusplus
 }
