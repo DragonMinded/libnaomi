@@ -1,5 +1,0 @@
-# Description: force free-play
-# File size: 75497472
-# Force this patch to only apply to the correct serial
-134: 42 41 55 30 -> 42 41 55 30
-C90A0: 42 84 -> 1A E0

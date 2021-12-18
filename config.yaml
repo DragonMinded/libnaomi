@@ -1,6 +1,0 @@
-cabinet_config: cabinets.yaml
-rom_directory:
- - roms
-patch_directory:
- - patches
-settings_directory: naomi/settings/definitions/

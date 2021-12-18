@@ -1,5 +1,0 @@
-# Description: force silent attract mode
-# File size: 134217728
-# Force this patch to only apply to the correct serial
-134: 42 41 43 30 -> 42 41 43 30
-4AC24: 59 23 -> 00 E3
