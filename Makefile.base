@@ -155,7 +155,7 @@ ROMFSGEN_FILE = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))tools/romfsgen.py
 ROMFSGEN = ${VENV_PYTHON3} ${ROMFSGEN_FILE}
 
 # Set up various toolchain utilities.
-MAKEROM_FILE = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))../scripts/makerom.py
+MAKEROM_FILE = $(dir $(abspath $(lastword $(MAKEFILE_LIST))))tools/makerom.py
 MAKEROM = ${VENV_PYTHON3} ${MAKEROM_FILE}
 
 # Set up library detection utility.

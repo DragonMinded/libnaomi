@@ -3,8 +3,7 @@ all: pyenv libnaomi libnaomimessage libnaomisprite examples tests
 ${NAOMI_BASE}/tools/pyenv:
 	mkdir -p ${NAOMI_BASE}/tools
 	cd ${NAOMI_BASE}/tools && python3 -m venv pyenv
-	${NAOMI_BASE}/tools/pyenv/bin/python3 -m pip install wheel pillow
-	cd ../ && ${NAOMI_BASE}/tools/pyenv/bin/python3 -m pip install --no-warn-conflicts .
+	${NAOMI_BASE}/tools/pyenv/bin/python3 -m pip install wheel pillow naomiutils netdimmutils
 
 .PHONY: pyenv
 pyenv: ${NAOMI_BASE}/tools/pyenv
@@ -51,7 +50,6 @@ install: libnaomi libnaomimessage libnaomisprite wipe-install-venv
 	cp aica.ld ${NAOMI_BASE}/tools
 	cp Makefile.external.base ${NAOMI_BASE}/tools/Makefile.base
 	cp tools/*.py ${NAOMI_BASE}/tools
-	cp ../scripts/makerom.py ${NAOMI_BASE}/tools
 
 .PHONY: clean
 clean:
