@@ -19,5 +19,5 @@ wheels/
 *.egg
 .netdimm_menu_settings.yaml
 MANIFEST
-homebrew/examples/*/*.bin
-homebrew/tests/*.bin
+examples/*/*.bin
+tests/*.bin
