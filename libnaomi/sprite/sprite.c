@@ -336,3 +336,51 @@ void sprite_draw_tilemap_entry_rotated(int x, int y, int tilesize, int which, fl
     /* Draw the sprite to the screen. */
     ta_draw_quad(TA_CMD_POLYGON_TYPE_TRANSPARENT, sprite, texture);
 }
+
+void sprite_draw_tilemap_entry_scaled(int x, int y, int tilesize, int which, float xscale, float yscale, texture_description_t *texture)
+{
+    /* Calculate the x/y position of the UV coordinates for this sprite in the tilemap. */
+    int tilestride = texture->width / tilesize;
+    int tiley = which / tilestride;
+    int tilex = which % tilestride;
+
+    float ulow;
+    float vlow;
+    float uhigh;
+    float vhigh;
+    if (xscale < 0.0)
+    {
+        ulow = (float)(tilesize * (tilex + 1)) / (float)texture->width;
+        uhigh = (float)(tilesize * tilex) / (float)texture->width;
+        xscale = -xscale;
+    }
+    else
+    {
+        ulow = (float)(tilesize * tilex) / (float)texture->width;
+        uhigh = (float)(tilesize * (tilex + 1)) / (float)texture->width;
+    }
+    if (yscale < 0.0)
+    {
+        vlow = (float)(tilesize * (tiley + 1)) / (float)texture->height;
+        vhigh = (float)(tilesize * tiley) / (float)texture->height;
+        yscale = -yscale;
+    }
+    else
+    {
+        vlow = (float)(tilesize * tiley) / (float)texture->height;
+        vhigh = (float)(tilesize * (tiley + 1)) / (float)texture->height;
+    }
+
+
+    /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
+     * on the screen. */
+    textured_vertex_t sprite[4] = {
+        { (float)x, (float)y + ((float)tilesize * yscale), 1.0, ulow, vhigh },
+        { (float)x, (float)y, 1.0, ulow, vlow },
+        { (float)x + ((float)tilesize * xscale), (float)y, 1.0, uhigh, vlow },
+        { (float)x + ((float)tilesize * xscale), (float)y + ((float)tilesize * yscale), 1.0, uhigh, vhigh }
+    };
+
+    /* Draw the sprite to the screen. */
+    ta_draw_quad(TA_CMD_POLYGON_TYPE_TRANSPARENT, sprite, texture);
+}

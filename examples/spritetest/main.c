@@ -10,7 +10,7 @@
 #define draw_text video_draw_text
 #endif
 
-#define MAXPAGES 2
+#define MAXPAGES 3
 
 #define WPAD (crate_png_width + 2)
 #define HPAD (crate_png_height + 2)
@@ -185,6 +185,26 @@ void main()
                 sprite_draw_nonsquare_scaled_rotated(64 + 305, 172, sonic_png_width, sonic_png_height, 1.5, 1.5, (tickcount * 2) % 360, sonic);
                 sprite_draw_nonsquare_scaled_rotated(64 + 305, 172 + 150, sonic_png_width, sonic_png_height, 0.5, 0.5, -((tickcount * 3) % 360), sonic);
                 sprite_draw_nonsquare_scaled_rotated(64 + 360, 172 + 150, sonic_png_width, sonic_png_height, -0.5, 0.5, (tickcount * 3) % 360, sonic);
+
+                break;
+            }
+            case 2:
+            {
+                /* Tilemaps (easy animation, 2D maps, etc). */
+                draw_text(64, 46, font, rgb(255, 255, 255), "Tilemap support with scaling:");
+
+                /* Draw animated coins, with full animation cycle every 30 frames. */
+                sprite_draw_tilemap_entry_scaled(64, 64, 32, ((tickcount / 6) % 5), 1.0, 2.0, coins);
+                sprite_draw_tilemap_entry_scaled(100, 64, 32, ((tickcount / 6) % 5), 2.0, 1.0, coins);
+                sprite_draw_tilemap_entry_scaled(164, 64, 32, ((tickcount / 6) % 5), 2.0, 2.0, coins);
+
+                sprite_draw_tilemap_entry_scaled(64, 140, 32, (((tickcount / 6) + 1) % 5) + 5, -1.0, -2.0, coins);
+                sprite_draw_tilemap_entry_scaled(100, 140, 32, (((tickcount / 6) + 1) % 5) + 5, -2.0, -1.0, coins);
+                sprite_draw_tilemap_entry_scaled(164, 140, 32, (((tickcount / 6) + 1) % 5) + 5, -2.0, -2.0, coins);
+
+                sprite_draw_tilemap_entry_scaled(64, 216, 32, (((tickcount / 6) + 3) % 5) + 10, 1.5, 1.5, coins);
+                sprite_draw_tilemap_entry_scaled(110, 216, 32, (((tickcount / 6) + 3) % 5) + 10, 0.75, 0.75, coins);
+                sprite_draw_tilemap_entry_scaled(138, 216, 32, (((tickcount / 6) + 3) % 5) + 10, 0.25, 0.25, coins);
 
                 break;
             }

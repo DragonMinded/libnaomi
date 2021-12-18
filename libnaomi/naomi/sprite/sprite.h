@@ -29,6 +29,10 @@ extern "C" {
 // it is recommended to use ta commands directly. These functions are presented
 // as an easy wrapper layer to the most common sprite routines and so more
 // advanced functionality is left out.
+//
+// Note that in all cases, sprites are drawn back to front in the order submitted.
+// So, if you want a sprite to overlap another, be careful to draw the one which
+// is to be behind first, and the one which is to be in front second.
 
 // Given a top left as well as bottom right x, y coordinate and a color to
 // fill a box in, draw a solid box to the screen. Note that this is monitor
@@ -126,6 +130,29 @@ void sprite_draw_tilemap_entry(int x, int y, int tilesize, int which, texture_de
 // was rotated 0 degrees, the x, y coordinates requested would be the top left
 // of the sprite. Note that this is monitor orientation aware.
 void sprite_draw_tilemap_entry_rotated(int x, int y, int tilesize, int which, float angle, texture_description_t *texture);
+
+// Given an X and Y pixel location on the screen, the size of each tile entry
+// in the tilemap in pixels (both directions, so the tile must be square) and
+// which tile to draw (starting with the top left as tile 0, increasing left
+// to right and then top to bottom), draw that sprite out of the tilemap
+// scaled in the x any y direction by the scale factor provided. The sprite
+// is drawn with the top left pixel at X, Y and scaling happens down and to
+// the right. You can give a negative scaling factor which has the effect of
+// mirroring the texture on that axis, but the sprite is still drawn from the
+// x, y coordinate down and right. Note that this is monitor orientation aware.
+void sprite_draw_tilemap_entry_scaled(int x, int y, int tilesize, int which, float xscale, float yscale, texture_description_t *texture);
+
+// Given an X and Y pixel location on the screen, the size of each tile entry
+// in the tilemap in pixels (both directions, so the tile must be square) and
+// which tile to draw (starting with the top left as tile 0, increasing left
+// to right and then top to bottom), draw that sprite out of the tilemap,
+// scaled by the scaling factors in the x and y axis and rotated about its
+// center. The sprite is drawn in the position where if it was rotated 0
+// degrees, the x, y coordinates requested would be the top left of the
+// sprite. If you give a negative scaling factor for an axis, the sprite will
+// be drawn with the texture flipped on that axis. Note that this is monitor
+// orientation aware.
+void sprite_draw_tilemap_entry_scaled_rotated(int x, int y, int tilesize, int which, float xscale, float yscale, float angle, texture_description_t *texture);
 
 #ifdef __cplusplus
 }
