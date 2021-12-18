@@ -90,7 +90,7 @@ void main()
                 page--;
             }
         }
-        else if (buttons.player1.right)
+        else if (buttons.player1.right || buttons.player1.start)
         {
             if (page == (MAXPAGES - 1))
             {
