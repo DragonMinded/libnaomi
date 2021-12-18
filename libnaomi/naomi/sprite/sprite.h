@@ -89,6 +89,27 @@ void sprite_draw_nonsquare(int x, int y, int width, int height, texture_descript
 // orientation aware.
 void sprite_draw_nonsquare_rotated(int x, int y, int width, int height, float angle, texture_description_t *texture);
 
+// Given an X and Y pixel location on the screen (based on the top left of the
+// screen), a sprite width and height, an x any scaling factor and a previously
+// loaded texture, draw that texture as a sprite with the requested scaling but
+// no rotation. The sprite is drawn with its upper left corner at the x, y
+// coordinates requested and the scaling happens down and to the right. This is
+// most useful when combined with ta_texture_load_sprite(). Note that you can
+// give this function negative scaling values to flip the texture in the x or
+// y orientation. Note also that this is monitor orientation aware.
+void sprite_draw_nonsquare_scaled(int x, int y, int width, int height, float xscale, float yscale, texture_description_t *texture);
+
+// Given an X and Y pixel location on the screen (based on the top left of the
+// screen), a sprite width and height, an x any scaling factor and a previously
+// loaded texture, draw that texture as a sprite with the requested scaling and
+// rotation in degrees. The sprite is drawn at the position where if it was
+// rotated 0 degrees, its upper left corner would be at the x, y coordinates
+// requested. This is most useful when combined with ta_texture_load_sprite().
+// Note that you can give this function negative scaling values to flip the
+// texture in the x or y orientation. Note also that this is monitor orientation
+// aware.
+void sprite_draw_nonsquare_scaled_rotated(int x, int y, int width, int height, float xscale, float yscale, float angle, texture_description_t *texture);
+
 // Given an X and Y pixel location on the screen, the size of each tile entry
 // in the tilemap in pixels (both directions, so the tile must be square) and
 // which tile to draw (starting with the top left as tile 0, increasing left

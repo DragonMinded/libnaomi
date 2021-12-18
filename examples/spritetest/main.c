@@ -174,6 +174,18 @@ void main()
                 sprite_draw_scaled(275 + 120, 64, 2.0, 2.0, diagonal);
                 sprite_draw_scaled_rotated(275 + 200, 64, 2.0, 2.0, (tickcount * 2) % 360, diagonal);
 
+                /* Odd shaped (non-square) sprites. */
+                draw_text(64, 138, font, rgb(255, 255, 255), "Odd-shaped (non-square) sprites can be scaled and rotated:");
+
+                /* Scaled odd sprite */
+                sprite_draw_nonsquare_scaled(64, 172, sonic_png_width, sonic_png_height, -2.0, 2.0, sonic);
+                sprite_draw_nonsquare_scaled(64 + 140, 172, sonic_png_width, sonic_png_height, 2.0, 2.0, sonic);
+
+                /* Rotated and scaled odd sprite */
+                sprite_draw_nonsquare_scaled_rotated(64 + 305, 172, sonic_png_width, sonic_png_height, 1.5, 1.5, (tickcount * 2) % 360, sonic);
+                sprite_draw_nonsquare_scaled_rotated(64 + 305, 172 + 150, sonic_png_width, sonic_png_height, 0.5, 0.5, -((tickcount * 3) % 360), sonic);
+                sprite_draw_nonsquare_scaled_rotated(64 + 360, 172 + 150, sonic_png_width, sonic_png_height, -0.5, 0.5, (tickcount * 3) % 360, sonic);
+
                 break;
             }
         }
