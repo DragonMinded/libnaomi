@@ -168,10 +168,11 @@ void main()
                 sprite_draw_scaled(64 + 120, 64, -1.0, -1.0, diagonal);
 
                 /* Sprites that scale normally. */
-                draw_text(300, 46, font, rgb(255, 255, 255), "Normal scaling of sprites:");
-                sprite_draw_scaled(300, 64, 1.0, 2.0, diagonal);
-                sprite_draw_scaled(300 + 40, 64, 2.0, 1.0, diagonal);
-                sprite_draw_scaled(300 + 120, 64, 2.0, 2.0, diagonal);
+                draw_text(275, 46, font, rgb(255, 255, 255), "Normal scaling/rotation of sprites:");
+                sprite_draw_scaled(275, 64, 1.0, 2.0, diagonal);
+                sprite_draw_scaled(275 + 40, 64, 2.0, 1.0, diagonal);
+                sprite_draw_scaled(275 + 120, 64, 2.0, 2.0, diagonal);
+                sprite_draw_scaled_rotated(275 + 200, 64, 2.0, 2.0, (tickcount * 2) % 360, diagonal);
 
                 break;
             }
