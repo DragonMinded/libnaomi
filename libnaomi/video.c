@@ -217,10 +217,10 @@ void _video_set_ta_registers()
     videobase[POWERVR2_FB_RENDER_MODULO] = (global_video_depth * global_video_width) / 8;
 
     // Set up horizontal clipping to clip within 0-640.
-    videobase[POWERVR2_FB_CLIP_X] = (global_video_width << 16) | (0 << 0);
+    videobase[POWERVR2_FB_CLIP_X] = ((global_video_width - 1) << 16) | (0 << 0);
 
     // Set up vertical clipping to within 0-480.
-    videobase[POWERVR2_FB_CLIP_Y] = (global_video_height << 16) | (0 << 0);
+    videobase[POWERVR2_FB_CLIP_Y] = ((global_video_height - 1) << 16) | (0 << 0);
 }
 
 void video_init(int colordepth)
