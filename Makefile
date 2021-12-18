@@ -37,8 +37,7 @@ wipe-install-venv:
 	mkdir -p ${NAOMI_BASE}/tools
 	cd ${NAOMI_BASE}/tools && rm -rf pyenv
 	cd ${NAOMI_BASE}/tools && python3 -m venv pyenv
-	${NAOMI_BASE}/tools/pyenv/bin/python3 -m pip install wheel pillow
-	cd ../ && ${NAOMI_BASE}/tools/pyenv/bin/python3 -m pip install --no-warn-conflicts .
+	${NAOMI_BASE}/tools/pyenv/bin/python3 -m pip install wheel pillow naomiutils netdimmutils
 
 .PHONY: install
 install: libnaomi libnaomimessage libnaomisprite wipe-install-venv
@@ -49,7 +48,7 @@ install: libnaomi libnaomimessage libnaomisprite wipe-install-venv
 	cp naomi.ld ${NAOMI_BASE}/tools
 	cp aica.ld ${NAOMI_BASE}/tools
 	cp Makefile.external.base ${NAOMI_BASE}/tools/Makefile.base
-	cp tools/*.py ${NAOMI_BASE}/tools
+	cp tools/*.py tools/gdbserver tools/peekpoke tools/stdioredirect ${NAOMI_BASE}/tools
 
 .PHONY: clean
 clean:

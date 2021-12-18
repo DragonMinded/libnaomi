@@ -2,6 +2,7 @@
 # Triforce Netfirm Toolbox, put into the public domain.
 # Please attribute properly, but only if you want.
 import argparse
+import os
 import sys
 
 from netdimm import NetDimm, PeekPokeTypeEnum
@@ -68,7 +69,11 @@ def main() -> int:
     )
 
     args = parser.parse_args()
-    netdimm = NetDimm(args.ip)
+    try:
+        netdimm = NetDimm(args.ip)
+    except AttributeError:
+        # Doesn't matter, we won't match the actions anyway.
+        netdimm = NetDimm("127.0.0.1")
 
     if args.action == "peek":
         if args.size == 1:
@@ -94,6 +99,10 @@ def main() -> int:
             netdimm.poke(int(args.address, 16), PeekPokeTypeEnum.TYPE_LONG, int(args.data, 16) & 0xFFFFFFFF)
         else:
             raise Exception(f"Invalid size selection {args.size}!")
+
+    else:
+        parser.print_usage()
+        print(f"{os.path.basename(__file__)}: invalid action to take!", file=sys.stderr)
 
     return 0
 

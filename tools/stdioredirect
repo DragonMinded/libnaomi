@@ -1,0 +1,3 @@
+#! /bin/sh
+
+${NAOMI_BASE}/tools/pyenv/bin/python3 ${NAOMI_BASE}/tools/stdioredirect.py "$@"
