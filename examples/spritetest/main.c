@@ -206,6 +206,18 @@ void main()
                 sprite_draw_tilemap_entry_scaled(110, 216, 32, (((tickcount / 6) + 3) % 5) + 10, 0.75, 0.75, coins);
                 sprite_draw_tilemap_entry_scaled(138, 216, 32, (((tickcount / 6) + 3) % 5) + 10, 0.25, 0.25, coins);
 
+                /* Tilemaps with rotation and scaling applied. */
+                draw_text(320, 46, font, rgb(255, 255, 255), "Tilemap support with scaling and rotation:");
+
+                /* Draw animated gems, with full cycle animation cycle every 60 frames. */
+                sprite_draw_tilemap_entry_scaled_rotated(320, 64, 32, (tickcount / 15) % 4, 2.0, 2.0, (tickcount * 3 + 40) % 360, color_gems);
+                sprite_draw_tilemap_entry_scaled_rotated(380, 64, 32, ((tickcount / 15) % 4) + 4, 2.0, 2.0, (tickcount * 3 + 80) % 360, color_gems);
+                sprite_draw_tilemap_entry_scaled_rotated(320, 138, 32, ((tickcount / 15) % 4) + 8, 1.5, 1.5, (tickcount * 3 + 120) % 360, color_gems);
+                sprite_draw_tilemap_entry_scaled_rotated(370, 138, 32, ((tickcount / 15) % 4) + 12, 1.5, 1.5, (tickcount * 3 + 160) % 360, color_gems);
+                sprite_draw_tilemap_entry_scaled_rotated(330, 192, 32, (tickcount / 15) % 4, 1.25, 1.25, (tickcount * 3 + 200) % 360, gray_gem);
+                sprite_draw_tilemap_entry_scaled_rotated(360, 192, 32, (tickcount / 15) % 4, 2.5, 1.25, (tickcount * 3 + 240) % 360, gray_gem);
+                sprite_draw_tilemap_entry_scaled_rotated(330, 240, 32, (tickcount / 15) % 4, 1.25, 2.5, (tickcount * 3 + 280) % 360, gray_gem);
+
                 break;
             }
         }
