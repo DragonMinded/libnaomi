@@ -6,6 +6,9 @@
 #include "naomi/interrupt.h"
 #include "naomi/message/packet.h"
 
+#define SEND_STATUS_REGISTER_SEED 3
+#define RECV_STATUS_REGISTER_SEED 7
+#define CONFIG_REGISTER_SEED 19
 typedef struct
 {
     packet_t *pending_packets[MAX_OUTSTANDING_PACKETS];
@@ -201,22 +204,22 @@ void packetlib_discard(int packetno)
     irq_restore(old_interrupts);
 }
 
-uint32_t checksum_add(uint32_t value)
+uint32_t checksum_add(uint32_t value, uint8_t seed)
 {
-    uint32_t sum = (value & 0xFF) + ((value >> 8) & 0xFF) + ((value >> 16) & 0xFF);
+    uint32_t sum = (value & 0xFF) + ((value >> 8) & 0xFF) + ((value >> 16) & 0xFF) + seed;
     return (((~sum) & 0xFF) << 24) | (value & 0x00FFFFFF);
 }
 
-int checksum_verify(uint32_t value)
+int checksum_verify(uint32_t value, uint8_t seed)
 {
-    uint32_t sum = (value & 0xFF) + ((value >> 8) & 0xFF) + ((value >> 16) & 0xFF);
+    uint32_t sum = (value & 0xFF) + ((value >> 8) & 0xFF) + ((value >> 16) & 0xFF) + seed;
     return (((~sum) & 0xFF) == ((value >> 24) & 0xFF)) ? 1 : 0;
 }
 
 void packetlib_set_config(uint32_t config_mask)
 {
     uint32_t old_interrupts = irq_disable();
-    packetlib_state.config = checksum_add(config_mask & 0x00FFFFFF);
+    packetlib_state.config = checksum_add(config_mask & 0x00FFFFFF, CONFIG_REGISTER_SEED);
     irq_restore(old_interrupts);
 }
 
@@ -286,7 +289,7 @@ uint32_t read_send_status()
     }
 
     // Actually return the data.
-    return checksum_add(regdata);
+    return checksum_add(regdata, SEND_STATUS_REGISTER_SEED);
 }
 
 void write_send_status(uint32_t status)
@@ -295,7 +298,7 @@ void write_send_status(uint32_t status)
     // things that the host is allowed to modify is the current location, so it
     // can rewind for missed data. It can also acknowledge the transfer by setting
     // the current location to the length of the packet.
-    if (checksum_verify(status))
+    if (checksum_verify(status, SEND_STATUS_REGISTER_SEED))
     {
         unsigned int location = status & 0xFFF;
         if (location < packetlib_state.pending_send_size)
@@ -400,7 +403,7 @@ uint32_t read_recv_status()
     }
 
     // Actually return the data.
-    return checksum_add(regdata);
+    return checksum_add(regdata, RECV_STATUS_REGISTER_SEED);
 }
 
 void write_recv_status(uint32_t status)
@@ -414,7 +417,7 @@ void write_recv_status(uint32_t status)
     // host does not have access to change the location. If the host determines that a
     // previous transfer was mid-way through and it does not have knowledge of it, then
     // it should cancel the transfer by writing all 0's to this register.
-    if (checksum_verify(status))
+    if (checksum_verify(status, RECV_STATUS_REGISTER_SEED))
     {
         unsigned int size = (status >> 12) & 0xFFF;
         if (size > 0 && size <= MAX_PACKET_LENGTH)
