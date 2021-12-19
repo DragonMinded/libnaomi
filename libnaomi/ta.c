@@ -284,7 +284,7 @@ void _ta_set_background_color(struct ta_buffers *buffers, uint32_t rgba)
      * first three vertexes of the quad. */
     int loc = 0;
     bgintpointer[loc++] =
-        TA_POLYMODE1_Z_GREATER |
+        TA_POLYMODE1_Z_GREATEREQUAL |
         TA_POLYMODE1_GOURAD_SHADED;
     bgintpointer[loc++] =
         TA_POLYMODE2_SRC_BLEND_ONE |
@@ -933,7 +933,7 @@ void ta_fill_box(uint32_t type, vertex_t *verticies, color_t color)
         TA_CMD_POLYGON_PACKED_COLOR |
         TA_CMD_POLYGON_16BIT_UV;
     mypoly.mode1 =
-        TA_POLYMODE1_Z_NEVER |
+        TA_POLYMODE1_Z_GREATEREQUAL |
         TA_POLYMODE1_CULL_DISABLED;
     mypoly.mode2 =
         TA_POLYMODE2_MIPMAP_D_1_00 |
@@ -991,7 +991,7 @@ void ta_draw_triangle_strip(uint32_t type, uint32_t striplen, textured_vertex_t 
         TA_CMD_POLYGON_PACKED_COLOR |
         TA_CMD_POLYGON_TEXTURED;
     mypoly.mode1 =
-        TA_POLYMODE1_Z_ALWAYS |
+        TA_POLYMODE1_Z_GREATEREQUAL |
         TA_POLYMODE1_CULL_CW;
     mypoly.mode2 =
         TA_POLYMODE2_MIPMAP_D_1_00 |
@@ -1165,7 +1165,7 @@ void ta_draw_quad(uint32_t type, textured_vertex_t *verticies, texture_descripti
         TA_CMD_POLYGON_16BIT_UV |
         TA_CMD_POLYGON_TEXTURED;
     mypoly.mode1 =
-        TA_POLYMODE1_Z_NEVER |
+        TA_POLYMODE1_Z_GREATEREQUAL |
         TA_POLYMODE1_CULL_DISABLED;
     mypoly.mode2 =
         TA_POLYMODE2_MIPMAP_D_1_00 |

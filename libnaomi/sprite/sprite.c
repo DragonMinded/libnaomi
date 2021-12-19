@@ -3,17 +3,45 @@
 #include "naomi/matrix.h"
 #include "naomi/sprite/sprite.h"
 
+// Where on the Z axis we put the sprites. This is a 1/Z value so higher is closer.
+#define Z_LOCATION 1000000000.0
+#define Z_INCREMENT 10000.0
+
+// Code for incrementing Z location so that we guarantee each sprite is in front of
+// all previously placed ones.
+extern unsigned int buffer_loc;
+static int last_buffer = -1;
+static float zloc = Z_LOCATION;
+
+float __sprite_z_location()
+{
+    // This is intentionally not made thread-safe as video/audio routines
+    // in libnaomi and sub-libraries are explicitly documented as not
+    // thread safe. You should only be doing graphics updates from one
+    // thread, so the overhead of locking can significantly slow rendering.
+    if ((int)buffer_loc != last_buffer)
+    {
+        zloc = Z_LOCATION;
+        last_buffer = (int)buffer_loc;
+    }
+
+    float cur_z = zloc;
+    zloc += Z_INCREMENT;
+    return cur_z;
+}
+
 void sprite_draw_box(int x0, int y0, int x1, int y1, color_t color)
 {
     int left = x0 < x1 ? x0 : x1;
     int right = x0 > x1 ? x0 : x1;
     int top = y0 < y1 ? y0 : y1;
     int bottom = y0 > y1 ? y0 : y1;
+    float z = __sprite_z_location();
     vertex_t box[4] = {
-        { (float)left, bottom, 1.0 },
-        { (float)left, top, 1.0 },
-        { (float)right, top, 1.0 },
-        { (float)right, bottom, 1.0 },
+        { (float)left, bottom, z },
+        { (float)left, top, z },
+        { (float)right, top, z },
+        { (float)right, bottom, z },
     };
 
     ta_fill_box(TA_CMD_POLYGON_TYPE_TRANSPARENT, box, color);
@@ -23,11 +51,12 @@ void sprite_draw_simple(int x, int y, texture_description_t *texture)
 {
     /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
      * on the screen. */
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)(y + texture->height), 1.0, 0.0, 1.0 },
-        { (float)x, (float)y, 1.0, 0.0, 0.0 },
-        { (float)(x + texture->width), (float)y, 1.0, 1.0, 0.0 },
-        { (float)(x + texture->width), (float)(y + texture->height), 1.0, 1.0, 1.0 }
+        { (float)x, (float)(y + texture->height), z, 0.0, 1.0 },
+        { (float)x, (float)y, z, 0.0, 0.0 },
+        { (float)(x + texture->width), (float)y, z, 1.0, 0.0 },
+        { (float)(x + texture->width), (float)(y + texture->height), z, 1.0, 1.0 }
     };
 
     /* Draw the sprite to the screen. */
@@ -38,11 +67,12 @@ void sprite_draw_rotated(int x, int y, float angle, texture_description_t *textu
 {
     /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
      * on the screen. */
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)(y + texture->height), 1.0, 0.0, 1.0 },
-        { (float)x, (float)y, 1.0, 0.0, 0.0 },
-        { (float)(x + texture->width), (float)y, 1.0, 1.0, 0.0 },
-        { (float)(x + texture->width), (float)(y + texture->height), 1.0, 1.0, 1.0 }
+        { (float)x, (float)(y + texture->height), z, 0.0, 1.0 },
+        { (float)x, (float)y, z, 0.0, 0.0 },
+        { (float)(x + texture->width), (float)y, z, 1.0, 0.0 },
+        { (float)(x + texture->width), (float)(y + texture->height), z, 1.0, 1.0 }
     };
     vertex_t origin = { (float)x + ((float)texture->width / 2.0), (float)y + ((float)texture->height / 2.0), 0.0 };
 
@@ -88,11 +118,12 @@ void sprite_draw_scaled(int x, int y, float xscale, float yscale, texture_descri
         vhigh = 1.0;
     }
 
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)y + ((float)texture->height * yscale), 1.0, ulow, vhigh },
-        { (float)x, (float)y, 1.0, ulow, vlow },
-        { (float)x + ((float)texture->width * xscale), (float)y, 1.0, uhigh, vlow },
-        { (float)x + ((float)texture->width * xscale), (float)y + ((float)texture->height * yscale), 1.0, uhigh, vhigh }
+        { (float)x, (float)y + ((float)texture->height * yscale), z, ulow, vhigh },
+        { (float)x, (float)y, z, ulow, vlow },
+        { (float)x + ((float)texture->width * xscale), (float)y, z, uhigh, vlow },
+        { (float)x + ((float)texture->width * xscale), (float)y + ((float)texture->height * yscale), z, uhigh, vhigh }
     };
 
     /* Draw the sprite to the screen. */
@@ -130,11 +161,12 @@ void sprite_draw_scaled_rotated(int x, int y, float xscale, float yscale, float 
         vhigh = 1.0;
     }
 
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)y + ((float)texture->height * yscale), 1.0, ulow, vhigh },
-        { (float)x, (float)y, 1.0, ulow, vlow },
-        { (float)x + ((float)texture->width * xscale), (float)y, 1.0, uhigh, vlow },
-        { (float)x + ((float)texture->width * xscale), (float)y + ((float)texture->height * yscale), 1.0, uhigh, vhigh }
+        { (float)x, (float)y + ((float)texture->height * yscale), z, ulow, vhigh },
+        { (float)x, (float)y, z, ulow, vlow },
+        { (float)x + ((float)texture->width * xscale), (float)y, z, uhigh, vlow },
+        { (float)x + ((float)texture->width * xscale), (float)y + ((float)texture->height * yscale), z, uhigh, vhigh }
     };
     vertex_t origin = { (float)x + ((float)texture->width * (xscale / 2.0)), (float)y + ((float)texture->height * (yscale / 2.0)), 0.0 };
 
@@ -153,11 +185,12 @@ void sprite_draw_nonsquare(int x, int y, int width, int height, texture_descript
 {
     /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
      * on the screen. */
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)(y + height), 1.0, 0.0, (float)height / (float)texture->height },
-        { (float)x, (float)y, 1.0, 0.0, 0.0 },
-        { (float)(x + width), (float)y, 1.0, (float)width / (float)texture->width, 0.0 },
-        { (float)(x + width), (float)(y + height), 1.0, (float)width / (float)texture->width, (float)height / (float)texture->height }
+        { (float)x, (float)(y + height), z, 0.0, (float)height / (float)texture->height },
+        { (float)x, (float)y, z, 0.0, 0.0 },
+        { (float)(x + width), (float)y, z, (float)width / (float)texture->width, 0.0 },
+        { (float)(x + width), (float)(y + height), z, (float)width / (float)texture->width, (float)height / (float)texture->height }
     };
 
     /* Draw the sprite to the screen. */
@@ -168,11 +201,12 @@ void sprite_draw_nonsquare_rotated(int x, int y, int width, int height, float an
 {
     /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
      * on the screen. */
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)(y + height), 1.0, 0.0, (float)height / (float)texture->height },
-        { (float)x, (float)y, 1.0, 0.0, 0.0 },
-        { (float)(x + width), (float)y, 1.0, (float)width / (float)texture->width, 0.0 },
-        { (float)(x + width), (float)(y + height), 1.0, (float)width / (float)texture->width, (float)height / (float)texture->height }
+        { (float)x, (float)(y + height), z, 0.0, (float)height / (float)texture->height },
+        { (float)x, (float)y, z, 0.0, 0.0 },
+        { (float)(x + width), (float)y, z, (float)width / (float)texture->width, 0.0 },
+        { (float)(x + width), (float)(y + height), z, (float)width / (float)texture->width, (float)height / (float)texture->height }
     };
     vertex_t origin = { (float)x + ((float)width / 2.0), (float)y + ((float)height / 2.0), 0.0 };
 
@@ -218,11 +252,12 @@ void sprite_draw_nonsquare_scaled(int x, int y, int width, int height, float xsc
         vhigh = (float)height / (float)texture->height;
     }
 
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)y + ((float)height * yscale), 1.0, ulow, vhigh },
-        { (float)x, (float)y, 1.0, ulow, vlow },
-        { (float)x + ((float)width * xscale), (float)y, 1.0, uhigh, vlow },
-        { (float)x + ((float)width * xscale), (float)y + ((float)height * yscale), 1.0, uhigh, vhigh }
+        { (float)x, (float)y + ((float)height * yscale), z, ulow, vhigh },
+        { (float)x, (float)y, z, ulow, vlow },
+        { (float)x + ((float)width * xscale), (float)y, z, uhigh, vlow },
+        { (float)x + ((float)width * xscale), (float)y + ((float)height * yscale), z, uhigh, vhigh }
     };
 
     /* Draw the sprite to the screen. */
@@ -260,11 +295,12 @@ void sprite_draw_nonsquare_scaled_rotated(int x, int y, int width, int height, f
         vhigh = (float)height / (float)texture->height;
     }
 
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)y + ((float)height * yscale), 1.0, ulow, vhigh },
-        { (float)x, (float)y, 1.0, ulow, vlow },
-        { (float)x + ((float)width * xscale), (float)y, 1.0, uhigh, vlow },
-        { (float)x + ((float)width * xscale), (float)y + ((float)height * yscale), 1.0, uhigh, vhigh }
+        { (float)x, (float)y + ((float)height * yscale), z, ulow, vhigh },
+        { (float)x, (float)y, z, ulow, vlow },
+        { (float)x + ((float)width * xscale), (float)y, z, uhigh, vlow },
+        { (float)x + ((float)width * xscale), (float)y + ((float)height * yscale), z, uhigh, vhigh }
     };
     vertex_t origin = { (float)x + ((float)width * (xscale / 2.0)), (float)y + ((float)height * (yscale / 2.0)), 0.0 };
 
@@ -293,11 +329,12 @@ void sprite_draw_tilemap_entry(int x, int y, int tilesize, int which, texture_de
 
     /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
      * on the screen. */
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)(y + tilesize), 1.0, ulow, vhigh },
-        { (float)x, (float)y, 1.0, ulow, vlow },
-        { (float)(x + tilesize), (float)y, 1.0, uhigh, vlow },
-        { (float)(x + tilesize), (float)(y + tilesize), 1.0, uhigh, vhigh }
+        { (float)x, (float)(y + tilesize), z, ulow, vhigh },
+        { (float)x, (float)y, z, ulow, vlow },
+        { (float)(x + tilesize), (float)y, z, uhigh, vlow },
+        { (float)(x + tilesize), (float)(y + tilesize), z, uhigh, vhigh }
     };
 
     /* Draw the sprite to the screen. */
@@ -318,11 +355,12 @@ void sprite_draw_tilemap_entry_rotated(int x, int y, int tilesize, int which, fl
 
     /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
      * on the screen. */
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)(y + tilesize), 1.0, ulow, vhigh },
-        { (float)x, (float)y, 1.0, ulow, vlow },
-        { (float)(x + tilesize), (float)y, 1.0, uhigh, vlow },
-        { (float)(x + tilesize), (float)(y + tilesize), 1.0, uhigh, vhigh }
+        { (float)x, (float)(y + tilesize), z, ulow, vhigh },
+        { (float)x, (float)y, z, ulow, vlow },
+        { (float)(x + tilesize), (float)y, z, uhigh, vlow },
+        { (float)(x + tilesize), (float)(y + tilesize), z, uhigh, vhigh }
     };
     vertex_t origin = { (float)x + ((float)tilesize / 2.0), (float)y + ((float)tilesize / 2.0), 0.0 };
 
@@ -374,11 +412,12 @@ void sprite_draw_tilemap_entry_scaled(int x, int y, int tilesize, int which, flo
 
     /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
      * on the screen. */
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)y + ((float)tilesize * yscale), 1.0, ulow, vhigh },
-        { (float)x, (float)y, 1.0, ulow, vlow },
-        { (float)x + ((float)tilesize * xscale), (float)y, 1.0, uhigh, vlow },
-        { (float)x + ((float)tilesize * xscale), (float)y + ((float)tilesize * yscale), 1.0, uhigh, vhigh }
+        { (float)x, (float)y + ((float)tilesize * yscale), z, ulow, vhigh },
+        { (float)x, (float)y, z, ulow, vlow },
+        { (float)x + ((float)tilesize * xscale), (float)y, z, uhigh, vlow },
+        { (float)x + ((float)tilesize * xscale), (float)y + ((float)tilesize * yscale), z, uhigh, vhigh }
     };
 
     /* Draw the sprite to the screen. */
@@ -422,11 +461,12 @@ void sprite_draw_tilemap_entry_scaled_rotated(int x, int y, int tilesize, int wh
 
     /* Set up the four corners of the quad so that the sprite is exactly 1:1 sized
      * on the screen. */
+    float z = __sprite_z_location();
     textured_vertex_t sprite[4] = {
-        { (float)x, (float)y + ((float)tilesize * yscale), 1.0, ulow, vhigh },
-        { (float)x, (float)y, 1.0, ulow, vlow },
-        { (float)x + ((float)tilesize * xscale), (float)y, 1.0, uhigh, vlow },
-        { (float)x + ((float)tilesize * xscale), (float)y + ((float)tilesize * yscale), 1.0, uhigh, vhigh }
+        { (float)x, (float)y + ((float)tilesize * yscale), z, ulow, vhigh },
+        { (float)x, (float)y, z, ulow, vlow },
+        { (float)x + ((float)tilesize * xscale), (float)y, z, uhigh, vlow },
+        { (float)x + ((float)tilesize * xscale), (float)y + ((float)tilesize * yscale), z, uhigh, vhigh }
     };
     vertex_t origin = { (float)x + ((float)tilesize * (xscale / 2.0)), (float)y + ((float)tilesize * (yscale / 2.0)), 0.0 };
 

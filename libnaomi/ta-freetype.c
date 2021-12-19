@@ -20,6 +20,9 @@
 // draw function U and V sizes below.
 #define SPRITEMAP_UVSIZE 256
 
+// Where on the Z axis we put the text. This is a 1/Z value so higher is closer.
+#define Z_LOCATION 10000000000.0
+
 typedef struct
 {
     void *texture;
@@ -261,10 +264,10 @@ void _ta_draw_cached_bitmap_horiz(int x, int y, unsigned int width, unsigned int
         float vhigh = (float)(ta_entry->v + high_y) / (float)SPRITEMAP_UVSIZE;
 
         textured_vertex_t verticies[4] = {
-            { (float)(x + low_x), (float)(y + high_y), 1.0, ulow, vhigh },
-            { (float)(x + low_x), (float)(y + low_y), 1.0, ulow, vlow },
-            { (float)(x + high_x), (float)(y + low_y), 1.0, uhigh, vlow },
-            { (float)(x + high_x), (float)(y + high_y), 1.0, uhigh, vhigh },
+            { (float)(x + low_x), (float)(y + high_y), Z_LOCATION, ulow, vhigh },
+            { (float)(x + low_x), (float)(y + low_y), Z_LOCATION, ulow, vlow },
+            { (float)(x + high_x), (float)(y + low_y), Z_LOCATION, uhigh, vlow },
+            { (float)(x + high_x), (float)(y + high_y), Z_LOCATION, uhigh, vhigh },
         };
 
         // This doesn't use the quad draw routines as it is slightly different
@@ -281,7 +284,7 @@ void _ta_draw_cached_bitmap_horiz(int x, int y, unsigned int width, unsigned int
             TA_CMD_POLYGON_16BIT_UV |
             TA_CMD_POLYGON_TEXTURED;
         mypoly.mode1 =
-            TA_POLYMODE1_Z_NEVER |
+            TA_POLYMODE1_Z_GREATEREQUAL |
             TA_POLYMODE1_CULL_DISABLED;
         mypoly.mode2 =
             TA_POLYMODE2_MIPMAP_D_1_00 |
@@ -372,10 +375,10 @@ void _ta_draw_cached_bitmap_vert(int x, int y, unsigned int width, unsigned int 
         float vhigh = (float)(ta_entry->v + high_y) / (float)SPRITEMAP_UVSIZE;
 
         textured_vertex_t verticies[4] = {
-            { (float)(x + low_x), (float)(y + high_y), 1.0, ulow, vhigh },
-            { (float)(x + low_x), (float)(y + low_y), 1.0, ulow, vlow },
-            { (float)(x + high_x), (float)(y + low_y), 1.0, uhigh, vlow },
-            { (float)(x + high_x), (float)(y + high_y), 1.0, uhigh, vhigh },
+            { (float)(x + low_x), (float)(y + high_y), Z_LOCATION, ulow, vhigh },
+            { (float)(x + low_x), (float)(y + low_y), Z_LOCATION, ulow, vlow },
+            { (float)(x + high_x), (float)(y + low_y), Z_LOCATION, uhigh, vlow },
+            { (float)(x + high_x), (float)(y + high_y), Z_LOCATION, uhigh, vhigh },
         };
 
         // This doesn't use the quad draw routines as it is slightly different
@@ -392,7 +395,7 @@ void _ta_draw_cached_bitmap_vert(int x, int y, unsigned int width, unsigned int 
             TA_CMD_POLYGON_16BIT_UV |
             TA_CMD_POLYGON_TEXTURED;
         mypoly.mode1 =
-            TA_POLYMODE1_Z_NEVER |
+            TA_POLYMODE1_Z_GREATEREQUAL |
             TA_POLYMODE1_CULL_DISABLED;
         mypoly.mode2 =
             TA_POLYMODE2_MIPMAP_D_1_00 |
