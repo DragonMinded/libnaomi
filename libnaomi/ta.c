@@ -1232,3 +1232,32 @@ void ta_draw_quad_uv(uint32_t type, vertex_t *verticies, uv_t *texcoords, textur
     };
     ta_draw_quad(type, real, texture);
 }
+
+// For some reason, sprites and other 2D geometry seem to have a random display order when
+// submitting them with the same Z depth. So, we keep a per-frame depth counter that all
+// sprite-based geometry which uses high-level libraries can use in order to guarantee that
+// submission order is equivalent to depth. Remember that Z coordinates are submitted as
+// 1/Z to the hardware, so the higher the number the closer the quad/triangle/etc is.
+#define Z_LOCATION 1000000000.0
+#define Z_INCREMENT 10000.0
+
+extern unsigned int buffer_loc;
+static int quad_last_buffer = -1;
+static float quad_zloc = Z_LOCATION;
+
+float __ta_quad_z_location()
+{
+    // This is intentionally not made thread-safe as video/audio routines
+    // in libnaomi and sub-libraries are explicitly documented as not
+    // thread safe. You should only be doing graphics updates from one
+    // thread, so the overhead of locking can significantly slow rendering.
+    if ((int)buffer_loc != quad_last_buffer)
+    {
+        quad_zloc = Z_LOCATION;
+        quad_last_buffer = (int)buffer_loc;
+    }
+
+    float cur_z = quad_zloc;
+    quad_zloc += Z_INCREMENT;
+    return cur_z;
+}

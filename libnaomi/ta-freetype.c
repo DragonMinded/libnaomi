@@ -20,8 +20,8 @@
 // draw function U and V sizes below.
 #define SPRITEMAP_UVSIZE 256
 
-// Where on the Z axis we put the text. This is a 1/Z value so higher is closer.
-#define Z_LOCATION 10000000000.0
+// Definition of quad Z location shared between us and sprite renderer.
+float __ta_quad_z_location();
 
 typedef struct
 {
@@ -263,11 +263,12 @@ void _ta_draw_cached_bitmap_horiz(int x, int y, unsigned int width, unsigned int
         float uhigh = (float)(ta_entry->u + high_x) / (float)SPRITEMAP_UVSIZE;
         float vhigh = (float)(ta_entry->v + high_y) / (float)SPRITEMAP_UVSIZE;
 
+        float z = __ta_quad_z_location();
         textured_vertex_t verticies[4] = {
-            { (float)(x + low_x), (float)(y + high_y), Z_LOCATION, ulow, vhigh },
-            { (float)(x + low_x), (float)(y + low_y), Z_LOCATION, ulow, vlow },
-            { (float)(x + high_x), (float)(y + low_y), Z_LOCATION, uhigh, vlow },
-            { (float)(x + high_x), (float)(y + high_y), Z_LOCATION, uhigh, vhigh },
+            { (float)(x + low_x), (float)(y + high_y), z, ulow, vhigh },
+            { (float)(x + low_x), (float)(y + low_y), z, ulow, vlow },
+            { (float)(x + high_x), (float)(y + low_y), z, uhigh, vlow },
+            { (float)(x + high_x), (float)(y + high_y), z, uhigh, vhigh },
         };
 
         // This doesn't use the quad draw routines as it is slightly different
@@ -374,11 +375,12 @@ void _ta_draw_cached_bitmap_vert(int x, int y, unsigned int width, unsigned int 
         float uhigh = (float)(ta_entry->u + high_x) / (float)SPRITEMAP_UVSIZE;
         float vhigh = (float)(ta_entry->v + high_y) / (float)SPRITEMAP_UVSIZE;
 
+        float z = __ta_quad_z_location();
         textured_vertex_t verticies[4] = {
-            { (float)(x + low_x), (float)(y + high_y), Z_LOCATION, ulow, vhigh },
-            { (float)(x + low_x), (float)(y + low_y), Z_LOCATION, ulow, vlow },
-            { (float)(x + high_x), (float)(y + low_y), Z_LOCATION, uhigh, vlow },
-            { (float)(x + high_x), (float)(y + high_y), Z_LOCATION, uhigh, vhigh },
+            { (float)(x + low_x), (float)(y + high_y), z, ulow, vhigh },
+            { (float)(x + low_x), (float)(y + low_y), z, ulow, vlow },
+            { (float)(x + high_x), (float)(y + low_y), z, uhigh, vlow },
+            { (float)(x + high_x), (float)(y + high_y), z, uhigh, vhigh },
         };
 
         // This doesn't use the quad draw routines as it is slightly different
