@@ -30,7 +30,11 @@ def main() -> int:
         '--mode',
         metavar='MODE',
         type=str,
-        help='The mode of the final sprite. Should match the video mode you are initializing. Options include "RGBA1555", "RGBA8888" and "INTENSITY8".',
+        help=(
+            'The mode of the final sprite. Should match the video mode you are initializing '
+            'or the format of the texture you are loading. Options include "RGB565", "RGBA1555", '
+            '"RGBA4444", "RGBA8888", "INTENSITY4" and "INTENSITY8".'
+        ),
     )
     parser.add_argument(
         '--raw',
@@ -50,13 +54,27 @@ def main() -> int:
     outdata: List[bytes] = []
     mode: str = args.mode.lower()
 
-    if mode == "intensity8":
+    if mode == "intensity4":
+        accum: List[int] = []
         for r, g, b, _ in pixels.getdata():
-            gray = int(0.2989 * r + 0.5870 * g + 0.1140 * b)
+            gray = round(0.2989 * r + 0.5870 * g + 0.1140 * b)
+            accum.append(gray >> 4)
+
+            if len(accum) == 2:
+                outdata.append(struct.pack("<B", (accum[0] << 4) | accum[1]))
+                accum = []
+        if accum:
+            raise Exception("Sprite had odd number of pixels in it, and INTENSITY4 needs two pixels per byte!")
+    elif mode == "intensity8":
+        for r, g, b, _ in pixels.getdata():
+            gray = round(0.2989 * r + 0.5870 * g + 0.1140 * b)
             outdata.append(struct.pack("<B", gray))
     elif mode == "rgba1555":
         for r, g, b, a in pixels.getdata():
             outdata.append(struct.pack("<H", ((b >> 3) & (0x1F << 0)) | ((g << 2) & (0x1F << 5)) | ((r << 7) & (0x1F << 10)) | ((a << 8) & 0x8000)))
+    elif mode == "rgb565":
+        for r, g, b, _ in pixels.getdata():
+            outdata.append(struct.pack("<H", ((b >> 3) & (0x1F << 0)) | ((g << 3) & (0x3F << 5)) | ((r << 8) & (0x1F << 11))))
     elif mode == "rgba4444":
         for r, g, b, a in pixels.getdata():
             outdata.append(struct.pack("<H", ((b >> 4) & 0xFF) | (g & 0xF0) | ((r << 4) & 0xF00) | ((a << 8) & 0xF000)))
