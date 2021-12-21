@@ -9,13 +9,13 @@ all: pvrtest.bin
 # missing missing `build/naomi.bin' target, so make sure all of
 # these files exist.
 SRCS += main.c
-SRCS += build/tex1.o
-SRCS += build/tex2.o
-SRCS += build/tex3.o
-SRCS += build/tex4.o
-SRCS += build/tex5.o
-SRCS += build/tex6.o
-SRCS += build/sprite1.o
+SRCS += tex1.png
+SRCS += tex2.png
+SRCS += tex3.png
+SRCS += tex4.png
+SRCS += tex5.png
+SRCS += tex6.png
+SRCS += sprite1.png
 
 # Pick up base makefile rules common to all examples.
 include ../../Makefile.base

@@ -10,17 +10,17 @@ all: spritetest.bin
 # these files exist.
 SRCS += main.c
 SRCS += dejavusans.ttf
-SRCS += build/crate.o
-SRCS += build/sonic.o
-SRCS += build/arrowlt.o
-SRCS += build/arrowrt.o
-SRCS += build/diagonal.o
+SRCS += crate.png
+SRCS += sonic.png
+SRCS += arrowlt.png
+SRCS += arrowrt.png
+SRCS += diagonal.png
 
 # These are from https://laredgames.itch.io/gems-coins-free which
 # I purchased to have some good sprites for this demo.
-SRCS += build/coins.o
-SRCS += build/color_gems.o
-SRCS += build/gray_gem.o
+SRCS += coins.png
+SRCS += color_gems.png
+SRCS += gray_gem.png
 
 # Pick up base makefile rules common to all examples.
 include ../../Makefile.base

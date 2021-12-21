@@ -118,35 +118,35 @@ ARMOBJCOPY = ${NAOMI_ARM_OBJCOPY}
 ARMAR = ${NAOMI_ARM_AR}
 
 # Our venv python3 so that dependencies work properly.
-VENV_PYTHON3 = ${NAOMI_BASE}/tools/pyenv/bin/python3
+VENV_PYTHON3 := ${NAOMI_BASE}/tools/pyenv/bin/python3
 
 # Set up various toolchain utilities.
-BIN2C_FILE = ${NAOMI_BASE}/tools/bin2c.py
-BIN2C = ${VENV_PYTHON3} ${BIN2C_FILE}
+BIN2C_FILE := ${NAOMI_BASE}/tools/bin2c.py
+BIN2C := ${VENV_PYTHON3} ${BIN2C_FILE}
 
 # Set up various toolchain utilities.
-ADDR = ${VENV_PYTHON3} ${NAOMI_BASE}/tools/addr.py
+ADDR := ${VENV_PYTHON3} ${NAOMI_BASE}/tools/addr.py
 
 # Set up various toolchain utilities.
-DATE = ${VENV_PYTHON3} ${NAOMI_BASE}/tools/date.py
+DATE := ${VENV_PYTHON3} ${NAOMI_BASE}/tools/date.py
 
 # Set up various toolchain utilities.
-IMG2C_FILE = ${NAOMI_BASE}/tools/sprite.py
-IMG2C = ${VENV_PYTHON3} ${IMG2C_FILE}
-IMG2BIN_FILE = ${NAOMI_BASE}/tools/sprite.py
-IMG2BIN = ${VENV_PYTHON3} ${IMG2BIN_FILE} --raw
+IMG2C_FILE := ${NAOMI_BASE}/tools/sprite.py
+IMG2C := ${VENV_PYTHON3} ${IMG2C_FILE}
+IMG2BIN_FILE := ${NAOMI_BASE}/tools/sprite.py
+IMG2BIN := ${VENV_PYTHON3} ${IMG2BIN_FILE} --raw
 
 # Set up various toolchain utilities.
-PITCHGEN_FILE = ${NAOMI_BASE}/tools/pitchgen.py
-PITCHGEN = ${VENV_PYTHON3} ${PITCHGEN_FILE}
+PITCHGEN_FILE := ${NAOMI_BASE}/tools/pitchgen.py
+PITCHGEN := ${VENV_PYTHON3} ${PITCHGEN_FILE}
 
 # Set up various toolchain utilities.
-ROMFSGEN_FILE = ${NAOMI_BASE}/tools/romfsgen.py
-ROMFSGEN = ${VENV_PYTHON3} ${ROMFSGEN_FILE}
+ROMFSGEN_FILE := ${NAOMI_BASE}/tools/romfsgen.py
+ROMFSGEN := ${VENV_PYTHON3} ${ROMFSGEN_FILE}
 
 # Set up various toolchain utilities.
-MAKEROM_FILE = ${NAOMI_BASE}/tools/makerom.py
-MAKEROM = ${VENV_PYTHON3} ${MAKEROM_FILE}
+MAKEROM_FILE := ${NAOMI_BASE}/tools/makerom.py
+MAKEROM := ${VENV_PYTHON3} ${MAKEROM_FILE}
 
 # Set up library detection utility.
 libmissing = $(shell ${LD} -l$(1) 2>&1 | grep "cannot find" | wc -l)
@@ -192,14 +192,14 @@ TEST_ADDR = $(shell ${ADDR} ${START_ADDR} 4)
 
 # Auto-compute objects based on sources we recognize. The rest of the sources will
 # be assumed to be objects that we want to include.
-OBJS = $(patsubst %.raw, build/%.o, $(patsubst %.ttf, build/%.o, $(patsubst %.cpp, build/%.o, $(patsubst %.s, build/%.o, $(patsubst %.c, build/%.o, $(SRCS))))))
+CODEOBJS = $(patsubst %.cpp, build/%.o, $(patsubst %.s, build/%.o, $(patsubst %.c, build/%.o, ${SRCS})))
+RAWOBJS = $(patsubst %.raw, build/%.o, ${CODEOBJS})
+FONTOBJS = $(patsubst %.ttf, build/%.o, ${RAWOBJS})
+IMGOBJS = $(patsubst %.jpg, build/%.o, $(patsubst %.png, build/%.o, ${FONTOBJS}))
+OBJS = ${IMGOBJS}
 
 # Any extra defines we want available to all homebrew programs.
 EXTRA_DEFINES = -DSERIAL=\"${SERIAL}\" -DBUILD_DATE=$(shell ${DATE}) -DSTART_ADDR=${START_ADDR}
-
-# A trick to gather up all library dependencies so we can recompile if they change.
-LIBDEPS_FILE = ${NAOMI_BASE}/tools/libdeps.py
-LIBDEPS = $(shell ${VENV_PYTHON3} ${LIBDEPS_FILE} ${LD} ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group)
 
 # Feature flags for 3rd party libraries.
 ifeq ($(call libmissing,freetype), 0)
@@ -215,6 +215,17 @@ FEATURE_ZLIB = 1
 else
 FEATURE_ZLIB = 0
 endif
+
+# A trick to gather up all library dependencies so we can recompile if they change.
+LIBDEPS_FILE := ${NAOMI_BASE}/tools/libdeps.py
+LIBDEPS := $(shell ${VENV_PYTHON3} ${LIBDEPS_FILE} ${LD} ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group)
+
+# Generate header dependencies so we can include them in subsequent builds.
+DEPDIR := build
+DEPFLAGS = -MT $@ -MMD -MP -MF $(DEPDIR)/$*.d
+
+# Handle automatic rebuild of c files when headers change (generated in c/cpp rules below).
+-include $(OBJS:.o=.d)
 
 # A rule for how we go from the final built elf file to a raw binary for extracting.
 build/%.bin: build/%.elf
@@ -239,12 +250,12 @@ build/%.o: %.s
 # A rule for how to build C files. Depends on the build dir being created.
 build/%.o: %.c
 	@mkdir -p $(dir $@)
-	${CC} -c $< -o $@ ${EXTRA_DEFINES}
+	${CC} ${DEPFLAGS} -c $< -o $@ ${EXTRA_DEFINES}
 
 # A rule for how to build C++ files. Depends on the build dir being created.
 build/%.o: %.cpp
 	@mkdir -p $(dir $@)
-	${CPP} -c $< -o $@ ${EXTRA_DEFINES}
+	${CPP} ${DEPFLAGS} -c $< -o $@ ${EXTRA_DEFINES}
 
 # A rule for how to build font files. Depends on the build dir being created.
 build/%.o: %.ttf ${BIN2C_FILE}

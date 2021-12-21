@@ -8,7 +8,7 @@ all: hellonaomi.bin
 # one of these files is not found, make will complain about a
 # missing missing `build/naomi.bin' target, so make sure all of
 # these files exist.
-SRCS += main.c build/sonic.o
+SRCS += main.c sonic.png
 
 # Pick up base makefile rules common to all examples.
 include ../../Makefile.base
