@@ -626,7 +626,7 @@ int matrix_perspective_transform_and_cull_textured_vertex(textured_vertex_t *src
 
 void matrix_rotate_x(float degrees)
 {
-    matrix_t matrix = {
+    static matrix_t matrix = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -639,7 +639,7 @@ void matrix_rotate_x(float degrees)
 
 void matrix_rotate_y(float degrees)
 {
-    matrix_t matrix = {
+    static matrix_t matrix = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -652,7 +652,7 @@ void matrix_rotate_y(float degrees)
 
 void matrix_rotate_z(float degrees)
 {
-    matrix_t matrix = {
+    static matrix_t matrix = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -765,7 +765,7 @@ void matrix_translate_z(float amount)
 
 void matrix_rotate_origin_x(vertex_t *origin, float amount)
 {
-    matrix_t backagain = {
+    static matrix_t backagain = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -777,7 +777,7 @@ void matrix_rotate_origin_x(vertex_t *origin, float amount)
     matrix_apply(&backagain);
     matrix_rotate_x(amount);
 
-    matrix_t there = {
+    static matrix_t there = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -791,7 +791,7 @@ void matrix_rotate_origin_x(vertex_t *origin, float amount)
 
 void matrix_rotate_origin_y(vertex_t *origin, float amount)
 {
-    matrix_t backagain = {
+    static matrix_t backagain = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -803,7 +803,7 @@ void matrix_rotate_origin_y(vertex_t *origin, float amount)
     matrix_apply(&backagain);
     matrix_rotate_y(amount);
 
-    matrix_t there = {
+    static matrix_t there = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -817,7 +817,7 @@ void matrix_rotate_origin_y(vertex_t *origin, float amount)
 
 void matrix_rotate_origin_z(vertex_t *origin, float amount)
 {
-    matrix_t backagain = {
+    static matrix_t backagain = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -829,7 +829,7 @@ void matrix_rotate_origin_z(vertex_t *origin, float amount)
     matrix_apply(&backagain);
     matrix_rotate_z(amount);
 
-    matrix_t there = {
+    static matrix_t there = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
