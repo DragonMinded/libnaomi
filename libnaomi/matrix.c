@@ -1,7 +1,8 @@
+#include <stdlib.h>
+#include <math.h>
 #include "naomi/interrupt.h"
 #include "naomi/matrix.h"
 #include "naomi/video.h"
-#include <math.h>
 
 #define MAX_MATRIXES 16
 
@@ -73,7 +74,7 @@ void matrix_init_perspective(float fovy, float zNear, float zFar)
             -cot_fovy_2 / aspect, 0.0, 0.0, 0.0,
             0.0, cot_fovy_2, 0.0, 0.0,
             0.0, 0.0, (zFar+zNear)/(zNear-zFar), -1.0,
-            0.0, 0.0, 2*zFar*zNear/(zNear-zFar), 1.0
+            0.0, 0.0, 2*zFar*zNear/(zNear-zFar), 0.0
         };
 
         matrix_init_identity();
@@ -101,7 +102,7 @@ void matrix_init_perspective(float fovy, float zNear, float zFar)
             -cot_fovy_2 / aspect, 0.0, 0.0, 0.0,
             0.0, cot_fovy_2, 0.0, 0.0,
             0.0, 0.0, (zFar+zNear)/(zNear-zFar), -1.0,
-            0.0, 0.0, 2*zFar*zNear/(zNear-zFar), 1.0
+            0.0, 0.0, 2*zFar*zNear/(zNear-zFar), 0.0
         };
 
         matrix_init_identity();
@@ -398,6 +399,70 @@ void matrix_perspective_transform_vertex(vertex_t *src, vertex_t *dest, int n)
     irq_restore(old_irq);
 }
 
+int matrix_perspective_transform_and_cull_vertex(vertex_t *src, vertex_t *dest, int n)
+{
+    // Let's do some bounds checking!
+    if (n <= 0) { return 0; }
+
+    uint32_t old_irq = irq_disable();
+
+    // Given a pre-set XMTRX (use matrix_clear() and matrix_apply() to get here),
+    // multiply it by a set of points to transform them from world space to screen space.
+    // These are extended to homogenous coordinates by assuming a "w" value of 1.0.
+    float savedz[n];
+    register vertex_t *src_param asm("r4") = src;
+    register vertex_t *dst_param asm("r5") = dest;
+    register float *z_param asm("r7") = savedz;
+    register int n_param asm("r6") = n;
+    asm(" \
+    .loop%=:\n \
+        fmov.s @r4+,fr0\n \
+        fmov.s @r4+,fr1\n \
+        fmov.s @r4+,fr2\n \
+        fldi1 fr3\n \
+        ftrv xmtrx,fv0\n \
+        dt r6\n \
+        fdiv fr3,fr0\n \
+        fmov.s fr0,@r5\n \
+        add #4,r5\n \
+        fdiv fr3,fr1\n \
+        fmov.s fr1,@r5\n \
+        add #4,r5\n \
+        fmov.s fr2,@r7\n \
+        add #4,r7\n \
+        fdiv fr3,fr2\n \
+        fmov.s fr2,@r5\n \
+        add #4,r5\n \
+        bf/s .loop%=\n \
+        nop\n \
+        " :
+        /* No outputs */ :
+        "r" (src_param), "r" (dst_param), "r" (n_param), "r" (z_param) :
+        "fr0", "fr1", "fr2", "fr3"
+    );
+
+    irq_restore(old_irq);
+
+    int oob = 0;
+    int visible = 0;
+    for (int i = 0; i < n; i++)
+    {
+        if (dest[i].z < 0.0)
+        {
+            oob = 1;
+            break;
+        }
+        if (savedz[i] < 0.0)
+        {
+            visible = 1;
+        }
+    }
+
+    // Never display if one or more point is out of bounds. Otherwise,
+    // display if any one point is visible.
+    return oob ? 0 : visible;
+}
+
 void matrix_affine_transform_textured_vertex(textured_vertex_t *src, textured_vertex_t *dest, int n)
 {
     // Let's do some bounds checking!
@@ -412,7 +477,7 @@ void matrix_affine_transform_textured_vertex(textured_vertex_t *src, textured_ve
     register textured_vertex_t *dst_param asm("r5") = dest;
     register int n_param asm("r6") = n;
     asm(" \
-    .affinetexloop:\n \
+    .loop%=:\n \
         fmov.s @r4+,fr0\n \
         fmov.s @r4+,fr1\n \
         fmov.s @r4+,fr2\n \
@@ -431,7 +496,7 @@ void matrix_affine_transform_textured_vertex(textured_vertex_t *src, textured_ve
         fmov.s @r4+,fr0\n \
         fmov.s fr0,@r5\n \
         add #4,r5\n \
-        bf/s .affinetexloop\n \
+        bf/s .loop%=\n \
         nop\n \
         " :
         /* No outputs */ :
@@ -456,7 +521,7 @@ void matrix_perspective_transform_textured_vertex(textured_vertex_t *src, textur
     register textured_vertex_t *dst_param asm("r5") = dest;
     register int n_param asm("r6") = n;
     asm(" \
-    .perspectivetexloop:\n \
+    .loop%=:\n \
         fmov.s @r4+,fr0\n \
         fmov.s @r4+,fr1\n \
         fmov.s @r4+,fr2\n \
@@ -478,7 +543,7 @@ void matrix_perspective_transform_textured_vertex(textured_vertex_t *src, textur
         fmov.s @r4+,fr0\n \
         fmov.s fr0,@r5\n \
         add #4,r5\n \
-        bf/s .perspectivetexloop\n \
+        bf/s .loop%=\n \
         nop\n \
         " :
         /* No outputs */ :
@@ -487,6 +552,76 @@ void matrix_perspective_transform_textured_vertex(textured_vertex_t *src, textur
     );
 
     irq_restore(old_irq);
+}
+
+int matrix_perspective_transform_and_cull_textured_vertex(textured_vertex_t *src, textured_vertex_t *dest, int n)
+{
+    // Let's do some bounds checking!
+    if (n <= 0) { return 0; }
+
+    uint32_t old_irq = irq_disable();
+
+    // Given a pre-set XMTRX (use matrix_clear() and matrix_apply() to get here),
+    // multiply it by a set of points to transform them from world space to screen space.
+    // These are extended to homogenous coordinates by assuming a "w" value of 1.0.
+    float savedz[n];
+    register textured_vertex_t *src_param asm("r4") = src;
+    register textured_vertex_t *dst_param asm("r5") = dest;
+    register float *z_param asm("r7") = savedz;
+    register int n_param asm("r6") = n;
+    asm(" \
+    .loop%=:\n \
+        fmov.s @r4+,fr0\n \
+        fmov.s @r4+,fr1\n \
+        fmov.s @r4+,fr2\n \
+        fldi1 fr3\n \
+        ftrv xmtrx,fv0\n \
+        dt r6\n \
+        fdiv fr3,fr0\n \
+        fmov.s fr0,@r5\n \
+        add #4,r5\n \
+        fdiv fr3,fr1\n \
+        fmov.s fr1,@r5\n \
+        add #4,r5\n \
+        fmov.s fr2,@r7\n \
+        add #4,r7\n \
+        fdiv fr3,fr2\n \
+        fmov.s fr2,@r5\n \
+        add #4,r5\n \
+        fmov.s @r4+,fr0\n \
+        fmov.s fr0,@r5\n \
+        add #4,r5\n \
+        fmov.s @r4+,fr0\n \
+        fmov.s fr0,@r5\n \
+        add #4,r5\n \
+        bf/s .loop%=\n \
+        nop\n \
+        " :
+        /* No outputs */ :
+        "r" (src_param), "r" (dst_param), "r" (n_param), "r" (z_param) :
+        "fr0", "fr1", "fr2", "fr3"
+    );
+
+    irq_restore(old_irq);
+
+    int oob = 0;
+    int visible = 0;
+    for (int i = 0; i < n; i++)
+    {
+        if (dest[i].z < 0.0)
+        {
+            oob = 1;
+            break;
+        }
+        if (savedz[i] < 0.0)
+        {
+            visible = 1;
+        }
+    }
+
+    // Never display if one or more point is out of bounds. Otherwise,
+    // display if any one point is visible.
+    return oob ? 0 : visible;
 }
 
 void matrix_rotate_x(float degrees)

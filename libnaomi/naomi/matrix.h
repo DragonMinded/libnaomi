@@ -115,6 +115,16 @@ void matrix_affine_transform_textured_vertex(textured_vertex_t *src, textured_ve
 void matrix_perspective_transform_vertex(vertex_t *src, vertex_t *dest, int n);
 void matrix_perspective_transform_textured_vertex(textured_vertex_t *src, textured_vertex_t *dest, int n);
 
+// Performs the exact transformation as the above two functions, but additionally
+// returns nonzero if the polygon is possibly visible on the screen, and zero if
+// the polygon is definitely not visible on the screen. This is not full frustum
+// culling as that would be more expensive. Instead it relies on the hardware to
+// discard polygons that are outside the global pixel clip region as set by the
+// TA register setup. It instead only checks to make sure that polygons are not
+// behind the "camera" represented by the current system matrix.
+int matrix_perspective_transform_and_cull_vertex(vertex_t *src, vertex_t *dest, int n);
+int matrix_perspective_transform_and_cull_textured_vertex(textured_vertex_t *src, textured_vertex_t *dest, int n);
+
 #ifdef __cplusplus
 }
 #endif
