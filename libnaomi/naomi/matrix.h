@@ -87,11 +87,13 @@ void matrix_rotate_origin_y(vertex_t *origin, float degrees);
 void matrix_rotate_origin_z(vertex_t *origin, float degrees);
 
 // Scale the system matrix on a given axis and given amount, where 1.0 is identity scale.
+void matrix_scale(float xamount, float yamount, float zamount);
 void matrix_scale_x(float amount);
 void matrix_scale_y(float amount);
 void matrix_scale_z(float amount);
 
 // Translate the system matrix on a given axis and given amount, where 0.0 is identity translation.
+void matrix_translate(float xamount, float yamount, float zamount);
 void matrix_translate_x(float amount);
 void matrix_translate_y(float amount);
 void matrix_translate_z(float amount);

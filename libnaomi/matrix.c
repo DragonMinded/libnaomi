@@ -663,9 +663,23 @@ void matrix_rotate_z(float degrees)
     matrix_apply(&matrix);
 }
 
+void matrix_scale(float xamount, float yamount, float zamount)
+{
+    static matrix_t matrix = {
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    };
+    matrix.a11 = xamount;
+    matrix.a22 = yamount;
+    matrix.a33 = zamount;
+    matrix_apply(&matrix);
+}
+
 void matrix_scale_x(float amount)
 {
-    matrix_t matrix = {
+    static matrix_t matrix = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -677,7 +691,7 @@ void matrix_scale_x(float amount)
 
 void matrix_scale_y(float amount)
 {
-    matrix_t matrix = {
+    static matrix_t matrix = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -689,7 +703,7 @@ void matrix_scale_y(float amount)
 
 void matrix_scale_z(float amount)
 {
-    matrix_t matrix = {
+    static matrix_t matrix = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -699,9 +713,23 @@ void matrix_scale_z(float amount)
     matrix_apply(&matrix);
 }
 
+void matrix_translate(float xamount, float yamount, float zamount)
+{
+    static matrix_t matrix = {
+        1.0, 0.0, 0.0, 0.0,
+        0.0, 1.0, 0.0, 0.0,
+        0.0, 0.0, 1.0, 0.0,
+        0.0, 0.0, 0.0, 1.0
+    };
+    matrix.a41 = xamount;
+    matrix.a42 = yamount;
+    matrix.a43 = zamount;
+    matrix_apply(&matrix);
+}
+
 void matrix_translate_x(float amount)
 {
-    matrix_t matrix = {
+    static matrix_t matrix = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -713,7 +741,7 @@ void matrix_translate_x(float amount)
 
 void matrix_translate_y(float amount)
 {
-    matrix_t matrix = {
+    static matrix_t matrix = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
@@ -725,7 +753,7 @@ void matrix_translate_y(float amount)
 
 void matrix_translate_z(float amount)
 {
-    matrix_t matrix = {
+    static matrix_t matrix = {
         1.0, 0.0, 0.0, 0.0,
         0.0, 1.0, 0.0, 0.0,
         0.0, 0.0, 1.0, 0.0,
