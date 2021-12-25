@@ -19,6 +19,7 @@ typedef struct
 // given two vertex points, return the vector that could be
 // added to the first vertex point to get the second.
 void vector_from_vertex(vector_t *vec, vertex_t *first, vertex_t *second);
+void vector_from_textured_vertex(vector_t *vec, textured_vertex_t *first, textured_vertex_t *second);
         
 // Given a vector, return its length.
 float vector_length(vector_t *vec);

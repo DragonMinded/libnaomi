@@ -14,6 +14,13 @@ void vector_from_vertex(vector_t *vec, vertex_t *first, vertex_t *second)
     vec->z = second->z - first->z;
 }
 
+void vector_from_textured_vertex(vector_t *vec, textured_vertex_t *first, textured_vertex_t *second)
+{
+    vec->x = second->x - first->x;
+    vec->y = second->y - first->y;
+    vec->z = second->z - first->z;
+}
+
 void vector_cross(vector_t *cross, vector_t *a, vector_t *b)
 {
     cross->x = (a->y * b->z) - (a->z * b->y);
