@@ -1145,6 +1145,173 @@ void ta_draw_triangle_strip_uv(uint32_t type, uint32_t striplen, vertex_t *verti
     }
 }
 
+void ta_draw_colored_triangle_strip(uint32_t type, uint32_t striplen, textured_vertex_t *verticies, texture_description_t *texture, color_t addcolor, color_t multcolor)
+{
+    struct polygon_list_packed_color mypoly;
+    struct vertex_list_packed_color_32bit_uv myvertex;
+
+    mypoly.cmd =
+        TA_CMD_POLYGON |
+        type |
+        TA_CMD_POLYGON_SUBLIST |
+        striplen |
+        TA_CMD_POLYGON_PACKED_COLOR |
+        TA_CMD_POLYGON_TEXTURED;
+    mypoly.mode1 =
+        TA_POLYMODE1_Z_GREATEREQUAL |
+        TA_POLYMODE1_CULL_CW;
+    mypoly.mode2 =
+        TA_POLYMODE2_MIPMAP_D_1_00 |
+        TA_POLYMODE2_TEXTURE_MODULATE |
+        texture->uvsize |
+        TA_POLYMODE2_TEXTURE_CLAMP_U |
+        TA_POLYMODE2_TEXTURE_CLAMP_V |
+        TA_POLYMODE2_FOG_DISABLED |
+        TA_POLYMODE2_SRC_BLEND_SRC_ALPHA |
+        TA_POLYMODE2_DST_BLEND_INV_SRC_ALPHA;
+    mypoly.texture =
+        texture->texture_mode |
+        TA_TEXTUREMODE_ADDRESS(texture->vram_location);
+    ta_commit_list(&mypoly, TA_LIST_SHORT);
+
+    myvertex.cmd = TA_CMD_VERTEX;
+    myvertex.mult_color = RGB0888(multcolor.r, multcolor.g, multcolor.b);
+    myvertex.add_color = RGB0888(addcolor.r, addcolor.g, addcolor.b);
+
+    myvertex.x = verticies[0].x;
+    myvertex.y = verticies[0].y;
+    myvertex.z = verticies[0].z;
+    myvertex.u = verticies[0].u;
+    myvertex.v = verticies[0].v;
+    ta_commit_list(&myvertex, TA_LIST_SHORT);
+
+    myvertex.x = verticies[1].x;
+    myvertex.y = verticies[1].y;
+    myvertex.z = verticies[1].z;
+    myvertex.u = verticies[1].u;
+    myvertex.v = verticies[1].v;
+    ta_commit_list(&myvertex, TA_LIST_SHORT);
+
+    myvertex.x = verticies[2].x;
+    myvertex.y = verticies[2].y;
+    myvertex.z = verticies[2].z;
+    myvertex.u = verticies[2].u;
+    myvertex.v = verticies[2].v;
+    if (striplen == TA_CMD_POLYGON_STRIPLENGTH_1)
+    {
+        myvertex.cmd |= TA_CMD_VERTEX_END_OF_STRIP;
+        ta_commit_list(&myvertex, TA_LIST_SHORT);
+    }
+    else
+    {
+        ta_commit_list(&myvertex, TA_LIST_SHORT);
+
+        myvertex.x = verticies[3].x;
+        myvertex.y = verticies[3].y;
+        myvertex.z = verticies[3].z;
+        myvertex.u = verticies[3].u;
+        myvertex.v = verticies[3].v;
+        if (striplen == TA_CMD_POLYGON_STRIPLENGTH_2)
+        {
+            myvertex.cmd |= TA_CMD_VERTEX_END_OF_STRIP;
+            ta_commit_list(&myvertex, TA_LIST_SHORT);
+        }
+        else
+        {
+            ta_commit_list(&myvertex, TA_LIST_SHORT);
+
+            myvertex.x = verticies[4].x;
+            myvertex.y = verticies[4].y;
+            myvertex.z = verticies[4].z;
+            myvertex.u = verticies[4].u;
+            myvertex.v = verticies[4].v;
+            ta_commit_list(&myvertex, TA_LIST_SHORT);
+
+            myvertex.x = verticies[5].x;
+            myvertex.y = verticies[5].y;
+            myvertex.z = verticies[5].z;
+            myvertex.u = verticies[5].u;
+            myvertex.v = verticies[5].v;
+            if (striplen == TA_CMD_POLYGON_STRIPLENGTH_4)
+            {
+                myvertex.cmd |= TA_CMD_VERTEX_END_OF_STRIP;
+                ta_commit_list(&myvertex, TA_LIST_SHORT);
+            }
+            else
+            {
+                ta_commit_list(&myvertex, TA_LIST_SHORT);
+
+                myvertex.x = verticies[6].x;
+                myvertex.y = verticies[6].y;
+                myvertex.z = verticies[6].z;
+                myvertex.u = verticies[6].u;
+                myvertex.v = verticies[6].v;
+                ta_commit_list(&myvertex, TA_LIST_SHORT);
+
+                myvertex.x = verticies[7].x;
+                myvertex.y = verticies[7].y;
+                myvertex.z = verticies[7].z;
+                myvertex.u = verticies[7].u;
+                myvertex.v = verticies[7].v;
+                myvertex.cmd |= TA_CMD_VERTEX_END_OF_STRIP;
+                ta_commit_list(&myvertex, TA_LIST_SHORT);
+            }
+        }
+    }
+}
+
+void ta_draw_colored_triangle_strip_uv(uint32_t type, uint32_t striplen, vertex_t *verticies, uv_t *uvcoords, texture_description_t *texture, color_t addcolor, color_t multcolor)
+{
+    // This might be faster if we just copy-pasta'd the above algorithm here and accessed
+    // both uvcoords and verticies directly. Might be worth it to squeeze more speed out
+    // of all this once a lot of this settles.
+    if (striplen == TA_CMD_POLYGON_STRIPLENGTH_1)
+    {
+        textured_vertex_t real[3] = {
+            { verticies[0].x, verticies[0].y, verticies[0].z, uvcoords[0].u, uvcoords[0].v },
+            { verticies[1].x, verticies[1].y, verticies[1].z, uvcoords[1].u, uvcoords[1].v },
+            { verticies[2].x, verticies[2].y, verticies[2].z, uvcoords[2].u, uvcoords[2].v },
+        };
+        ta_draw_colored_triangle_strip(type, striplen, real, texture, addcolor, multcolor);
+    }
+    else if (striplen == TA_CMD_POLYGON_STRIPLENGTH_2)
+    {
+        textured_vertex_t real[4] = {
+            { verticies[0].x, verticies[0].y, verticies[0].z, uvcoords[0].u, uvcoords[0].v },
+            { verticies[1].x, verticies[1].y, verticies[1].z, uvcoords[1].u, uvcoords[1].v },
+            { verticies[2].x, verticies[2].y, verticies[2].z, uvcoords[2].u, uvcoords[2].v },
+            { verticies[3].x, verticies[3].y, verticies[3].z, uvcoords[3].u, uvcoords[3].v },
+        };
+        ta_draw_colored_triangle_strip(type, striplen, real, texture, addcolor, multcolor);
+    }
+    else if (striplen == TA_CMD_POLYGON_STRIPLENGTH_4)
+    {
+        textured_vertex_t real[6] = {
+            { verticies[0].x, verticies[0].y, verticies[0].z, uvcoords[0].u, uvcoords[0].v },
+            { verticies[1].x, verticies[1].y, verticies[1].z, uvcoords[1].u, uvcoords[1].v },
+            { verticies[2].x, verticies[2].y, verticies[2].z, uvcoords[2].u, uvcoords[2].v },
+            { verticies[3].x, verticies[3].y, verticies[3].z, uvcoords[3].u, uvcoords[3].v },
+            { verticies[4].x, verticies[4].y, verticies[4].z, uvcoords[4].u, uvcoords[4].v },
+            { verticies[5].x, verticies[5].y, verticies[5].z, uvcoords[5].u, uvcoords[5].v },
+        };
+        ta_draw_colored_triangle_strip(type, striplen, real, texture, addcolor, multcolor);
+    }
+    else
+    {
+        textured_vertex_t real[8] = {
+            { verticies[0].x, verticies[0].y, verticies[0].z, uvcoords[0].u, uvcoords[0].v },
+            { verticies[1].x, verticies[1].y, verticies[1].z, uvcoords[1].u, uvcoords[1].v },
+            { verticies[2].x, verticies[2].y, verticies[2].z, uvcoords[2].u, uvcoords[2].v },
+            { verticies[3].x, verticies[3].y, verticies[3].z, uvcoords[3].u, uvcoords[3].v },
+            { verticies[4].x, verticies[4].y, verticies[4].z, uvcoords[4].u, uvcoords[4].v },
+            { verticies[5].x, verticies[5].y, verticies[5].z, uvcoords[5].u, uvcoords[5].v },
+            { verticies[6].x, verticies[6].y, verticies[6].z, uvcoords[6].u, uvcoords[6].v },
+            { verticies[7].x, verticies[7].y, verticies[7].z, uvcoords[7].u, uvcoords[7].v },
+        };
+        ta_draw_colored_triangle_strip(type, striplen, real, texture, addcolor, multcolor);
+    }
+}
+
 uint32_t _ta_16bit_uv(float uv)
 {
     union intfloat f2i;

@@ -451,6 +451,13 @@ void ta_draw_quad_uv(uint32_t type, vertex_t *verticies, uv_t *texcoords, textur
 void ta_draw_triangle_strip(uint32_t type, uint32_t striplen, textured_vertex_t *verticies, texture_description_t *texture);
 void ta_draw_triangle_strip_uv(uint32_t type, uint32_t striplen, vertex_t *verticies, uv_t *uvcoords, texture_description_t *texture);
 
+// Identical to the above two commands, but also includes an RGB value to add to each pixel
+// to compute the final color, and an RGB value to multiply against each pixel to compute
+// the final color. This can be used for diffuse/spectral/ambient lighting applied on a
+// per-polygon basis (flat shaded, not gourad shaded).
+void ta_draw_colored_triangle_strip(uint32_t type, uint32_t striplen, textured_vertex_t *verticies, texture_description_t *texture, color_t addcolor, color_t multcolor);
+void ta_draw_colored_triangle_strip_uv(uint32_t type, uint32_t striplen, vertex_t *verticies, uv_t *uvcoords, texture_description_t *texture, color_t addcolor, color_t multcolor);
+
 // Include the freetype extensions for you, so you don't have to include ta-freetype.h yourself.
 #include "ta-freetype.h"
 
