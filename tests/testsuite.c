@@ -46,6 +46,34 @@ do { \
     } \
 } while(0)
 
+#define ASSERT_EQUAL(expected, actual, msg, ...) \
+do { \
+    if (expected != actual) { \
+        context->result = TEST_FAILED; \
+        int __len = snprintf(context->reason, context->reasonleft, "assertion failure"); \
+        context->reason += __len; \
+        context->reasonleft -= __len; \
+        LOG("%c[31mASSERTION FAILED (%s:%d)%c[0m:\n  %s != %s,\n  ", 0x1B, context->name, __LINE__, 0x1B, #expected, #actual); \
+        LOG(msg, ##__VA_ARGS__); \
+        return; \
+    } \
+} while(0)
+
+#define SMALL_VALUE 0.0001
+
+#define ASSERT_APPROX(expected, actual, msg, ...) \
+do { \
+    if (fabs(expected - actual) > SMALL_VALUE) { \
+        context->result = TEST_FAILED; \
+        int __len = snprintf(context->reason, context->reasonleft, "assertion failure"); \
+        context->reason += __len; \
+        context->reasonleft -= __len; \
+        LOG("%c[31mASSERTION FAILED (%s:%d)%c[0m:\n  %s != %s,\n  ", 0x1B, context->name, __LINE__, 0x1B, #expected, #actual); \
+        LOG(msg, ##__VA_ARGS__); \
+        return; \
+    } \
+} while(0)
+
 #define ASSERT_ARRAYS_EQUAL(expected, actual, msg, ...) \
 do { \
     for (unsigned int __pos = 0; __pos < (sizeof(expected) / sizeof((expected)[0])); __pos++) { \
