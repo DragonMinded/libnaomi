@@ -543,6 +543,10 @@ void video_fill_box(int x0, int y0, int x1, int y1, color_t color)
 
 void video_draw_pixel(int x, int y, color_t color)
 {
+    // Let's do some basic bounds testing.
+    if (((uint32_t)(x | y)) & 0x80000000) { return; }
+    if (x >= cached_actual_width || y >= cached_actual_height) { return; }
+
     if (global_video_depth == 2)
     {
         uint32_t actualcolor = RGB0555(color.r, color.g, color.b);
@@ -637,6 +641,12 @@ void video_draw_line(int x0, int y0, int x1, int y1, color_t color)
     else
     {
         sx = 1;
+    }
+
+    if (dx == 0 && dy == 0)
+    {
+        video_draw_pixel(x0, y0, color);
+        return;
     }
 
     dy <<= 1;
