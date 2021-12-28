@@ -6,7 +6,6 @@
 # erase=0|1                     Erase build directories on the fly to save space
 # thread_model=single|posix     Set gcc threading model
 # verbose=0|1                   Display
-# makejobs=-jn                  Set the number of jobs for calls to make to n
 #
 # Interesting targets (you can 'make' any of these):
 # all: build
@@ -41,7 +40,7 @@ arm_binutils_ver=2.34
 arm_gcc_ver=8.5.0
 
 # Threading model, either posix or single-threaded.
-thread_model=single
+thread_model=posix
 erase=1
 verbose=1
 

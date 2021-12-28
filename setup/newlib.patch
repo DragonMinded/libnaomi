@@ -21,3 +21,60 @@
      return __setup_argv_for_main (argc);
  }
 +#endif
+--- newlib-4.1.0/newlib/libc/include/pthread.h	2021-12-27 23:18:33.008807357 +0000
++++ newlib-4.1.0/newlib/libc/include/pthread.h	2021-12-27 23:42:04.102665384 +0000
+@@ -24,8 +24,6 @@
+ 
+ #include <unistd.h>
+ 
+-#if defined(_POSIX_THREADS)
+-
+ #include <sys/types.h>
+ #include <time.h>
+ #include <sched.h>
+@@ -51,14 +49,15 @@
+ int	pthread_mutexattr_setpshared (pthread_mutexattr_t *__attr,
+ 				      int __pshared);
+ 
+-#if defined(_UNIX98_THREAD_MUTEX_ATTRIBUTES)
+-
+ /* Single UNIX Specification 2 Mutex Attributes types */
+ 
+ int pthread_mutexattr_gettype (const pthread_mutexattr_t *__attr, int *__kind);
+ int pthread_mutexattr_settype (pthread_mutexattr_t *__attr, int __kind);
+ 
+-#endif
++#define PTHREAD_MUTEX_NORMAL 0
++#define PTHREAD_MUTEX_ERRORCHECK 1
++#define PTHREAD_MUTEX_RECURSIVE 2
++#define PTHREAD_MUTEX_DEFAULT PTHREAD_MUTEX_NORMAL
+ 
+ /* Initializing and Destroying a Mutex, P1003.1c/Draft 10, p. 87 */
+ 
+@@ -363,8 +362,7 @@
+ #endif /* defined(_POSIX_THREAD_CPUTIME) */
+ 
+ 
+-#endif /* defined(_POSIX_THREADS) */
+
+ #if defined(_POSIX_BARRIERS)
+ 
+ int	pthread_barrierattr_init (pthread_barrierattr_t *__attr);
+--- newlib-4.1.0/newlib/libc/include/sched.h	2020-12-18 23:50:49.000000000 +0000
++++ newlib-4.1.0/newlib/libc/include/sched.h	2021-12-27 23:36:22.387151279 +0000
+@@ -81,15 +81,11 @@
+ );
+ #endif /* _POSIX_PRIORITY_SCHEDULING */
+ 
+-#if defined(_POSIX_THREADS) || defined(_POSIX_PRIORITY_SCHEDULING)
+-
+ /*
+  *  XBD 13 - Yield Processor, P1003.1b-2008, p. 1807
+  */
+ int sched_yield( void );
+ 
+-#endif /* _POSIX_THREADS or _POSIX_PRIORITY_SCHEDULING */
+-
+ #if __GNU_VISIBLE
+ int sched_getcpu(void);
+ 
