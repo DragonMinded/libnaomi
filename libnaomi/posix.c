@@ -1770,14 +1770,32 @@ int pthread_equal(pthread_t t1, pthread_t t2)
     return (uint32_t)t1 == (uint32_t)t2;
 }
 
-void pthread_yield (void)
+void pthread_yield(void)
 {
     _pthread_gc();
     thread_yield();
 }
 
-void pthread_exit (void *value_ptr)
+void pthread_exit(void *value_ptr)
 {
     thread_exit(value_ptr);
     __builtin_unreachable();
+}
+
+int pthread_getcpuclockid(pthread_t thread, clockid_t *clock_id)
+{
+    // We don't support per-CPU pthread clocks.
+    return ENOENT;
+}
+
+int pthread_setconcurrency(int new_level)
+{
+    // We don't support concurrency levels, since we are single-cored.
+    return EINVAL;
+}
+
+int pthread_getconcurrency(void)
+{
+    // We don't support concurrency levels, since we are single-cored.
+    return EINVAL;
 }
