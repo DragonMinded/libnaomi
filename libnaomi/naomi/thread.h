@@ -109,8 +109,10 @@ void thread_destroy(uint32_t tid);
 
 // Various thread manipulation functions. Get information about a thread, start and stop a
 // thread, change priority on a thread, etc. All of these are safe to call from within any
-// thread including the thread in questions.
-void thread_info(uint32_t tid, thread_info_t *info);
+// thread including the thread in questions. If the thread itself does not exist, then
+// thread_info() will return zero. Otherwise it will return nonzero. The thread info struct
+// will only be updated if it is not NULL and the thread exists.
+int thread_info(uint32_t tid, thread_info_t *info);
 void thread_priority(uint32_t tid, int priority);
 void thread_start(uint32_t tid);
 void thread_stop(uint32_t tid);

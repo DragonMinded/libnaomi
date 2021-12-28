@@ -2088,7 +2088,7 @@ void thread_priority(uint32_t tid, int priority)
     asm("trapa #6" : : "r" (syscall_param0), "r" (syscall_param1));
 }
 
-void thread_info(uint32_t tid, thread_info_t *info)
+int thread_info(uint32_t tid, thread_info_t *info)
 {
     uint32_t old_interrupts = irq_disable();
 
@@ -2116,6 +2116,7 @@ void thread_info(uint32_t tid, thread_info_t *info)
     }
 
     irq_restore(old_interrupts);
+    return thread != NULL;
 }
 
 void thread_yield()

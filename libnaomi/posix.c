@@ -9,6 +9,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <pthread.h>
 #include "naomi/interrupt.h"
 #include "naomi/posix.h"
 #include "naomi/rtc.h"
@@ -1586,4 +1587,60 @@ int closedir(DIR *dirp)
             return -1;
         }
     }
+}
+
+int pthread_create(
+    pthread_t *pthread,
+    const pthread_attr_t *attr,
+    void *(*start_routine)(void *),
+    void *arg
+) {
+    if (attr)
+    {
+        // I'm not sure if we'll ever support these attributes. Its a lot of
+        // extra work to inform the thread system and I'm not sure of the
+        // benefits.
+        return EINVAL;
+    }
+
+    uint32_t new_thread = thread_create("pthread", start_routine, arg);
+    if (new_thread)
+    {
+        *pthread = (pthread_t)new_thread;
+        thread_start(new_thread);
+        return 0;
+    }
+    else
+    {
+        return EAGAIN;
+    }
+}
+
+int pthread_join(pthread_t pthread, void **value_ptr)
+{
+    if (thread_info((uint32_t)pthread, NULL))
+    {
+        void *ret = thread_join((uint32_t)pthread);
+        thread_destroy((uint32_t)pthread);
+        if (value_ptr)
+        {
+            *value_ptr = ret;
+        }
+
+        return 0;
+    }
+    else
+    {
+        return ESRCH;
+    }
+}
+
+pthread_t pthread_self(void)
+{
+    return (pthread_t)thread_id();
+}
+
+int pthread_equal(pthread_t t1, pthread_t t2)
+{
+    return (uint32_t)t1 == (uint32_t)t2;
 }
