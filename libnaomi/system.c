@@ -211,6 +211,87 @@ void _enter()
     _halt();
 }
 
+void _hw_memset(void *addr, uint32_t value, unsigned int amount)
+{
+    // Set the base queue address pointer to the queue location with address bits
+    // 25:5. The bottom bits should be all 0s since hw_memset requires an alignment
+    // to a 32 byte boundary. We will use both queue areas since SQ0/SQ1 specification
+    // is the same bit as address bit 5. Technically this means the below queue setup
+    // interleaves the data between the two queues, but it really does not matter what
+    // order the hardware copies things.
+    uint32_t *queue = (uint32_t *)(STORE_QUEUE_BASE | (((uint32_t)addr) & 0x03FFFFE0));
+    uint32_t actual_copy_addr = (uint32_t)addr;
+    uint32_t stop_copy_addr = actual_copy_addr + (amount & 0xFFFFFFE0);
+    uint32_t stored_addr_bits = (actual_copy_addr >> 24) & 0x1C;
+
+    // Set the top address bits (28:26) into the store queue address control registers.
+    QACR0 = stored_addr_bits;
+    QACR1 = stored_addr_bits;
+
+    // Now, set up both store queues to contain the same value that we want to memset.
+    // This is 8 32-bit values per store queue.
+    queue[0] = value;
+    queue[1] = value;
+    queue[2] = value;
+    queue[3] = value;
+    queue[4] = value;
+    queue[5] = value;
+    queue[6] = value;
+    queue[7] = value;
+    queue[8] = value;
+    queue[9] = value;
+    queue[10] = value;
+    queue[11] = value;
+    queue[12] = value;
+    queue[13] = value;
+    queue[14] = value;
+    queue[15] = value;
+
+    // Now, trigger the hardware to copy the values from the queue to the address we
+    // care about, triggering one 32-byte prefetch at a time.
+    while (actual_copy_addr != stop_copy_addr)
+    {
+        // Make sure we don't wrap around our top address bits.
+        if (((actual_copy_addr >> 24) & 0x1C) != stored_addr_bits)
+        {
+            // Re-init the top address control registers and the queue.
+            stored_addr_bits = (actual_copy_addr >> 24) & 0x1C;
+            QACR0 = stored_addr_bits;
+            QACR1 = stored_addr_bits;
+
+            // Now, set up both store queues to contain the same value that we want to memset.
+            // This is 8 32-bit values per store queue.
+            queue[0] = value;
+            queue[1] = value;
+            queue[2] = value;
+            queue[3] = value;
+            queue[4] = value;
+            queue[5] = value;
+            queue[6] = value;
+            queue[7] = value;
+            queue[8] = value;
+            queue[9] = value;
+            queue[10] = value;
+            queue[11] = value;
+            queue[12] = value;
+            queue[13] = value;
+            queue[14] = value;
+            queue[15] = value;
+        }
+
+        // Perform the actual memset.
+        __asm__("pref @%0" : : "r"(queue));
+        queue += 8;
+        actual_copy_addr += 32;
+    }
+
+    // Finally, attempt a new write to both queues in order to stall the CPU until the
+    // last write is done.
+    queue = (uint32_t *)STORE_QUEUE_BASE;
+    queue[0] = 0;
+    queue[8] = 0;
+}
+
 int hw_memset(void *addr, uint32_t value, unsigned int amount)
 {
     // Very similar to a standard memset, but the address pointer must be aligned
@@ -230,83 +311,8 @@ int hw_memset(void *addr, uint32_t value, unsigned int amount)
     int successful = 0;
     if (mutex_try_lock(&queue_mutex))
     {
-        // Set the base queue address pointer to the queue location with address bits
-        // 25:5. The bottom bits should be all 0s since hw_memset requires an alignment
-        // to a 32 byte boundary. We will use both queue areas since SQ0/SQ1 specification
-        // is the same bit as address bit 5. Technically this means the below queue setup
-        // interleaves the data between the two queues, but it really does not matter what
-        // order the hardware copies things.
-        uint32_t *queue = (uint32_t *)(STORE_QUEUE_BASE | (((uint32_t)addr) & 0x03FFFFE0));
-        uint32_t actual_copy_addr = (uint32_t)addr;
-        uint32_t stop_copy_addr = actual_copy_addr + (amount & 0xFFFFFFE0);
-        uint32_t stored_addr_bits = (actual_copy_addr >> 24) & 0x1C;
-
-        // Set the top address bits (28:26) into the store queue address control registers.
-        QACR0 = stored_addr_bits;
-        QACR1 = stored_addr_bits;
-
-        // Now, set up both store queues to contain the same value that we want to memset.
-        // This is 8 32-bit values per store queue.
-        queue[0] = value;
-        queue[1] = value;
-        queue[2] = value;
-        queue[3] = value;
-        queue[4] = value;
-        queue[5] = value;
-        queue[6] = value;
-        queue[7] = value;
-        queue[8] = value;
-        queue[9] = value;
-        queue[10] = value;
-        queue[11] = value;
-        queue[12] = value;
-        queue[13] = value;
-        queue[14] = value;
-        queue[15] = value;
-
-        // Now, trigger the hardware to copy the values from the queue to the address we
-        // care about, triggering one 32-byte prefetch at a time.
-        while (actual_copy_addr != stop_copy_addr)
-        {
-            // Make sure we don't wrap around our top address bits.
-            if (((actual_copy_addr >> 24) & 0x1C) != stored_addr_bits)
-            {
-                // Re-init the top address control registers and the queue.
-                stored_addr_bits = (actual_copy_addr >> 24) & 0x1C;
-                QACR0 = stored_addr_bits;
-                QACR1 = stored_addr_bits;
-
-                // Now, set up both store queues to contain the same value that we want to memset.
-                // This is 8 32-bit values per store queue.
-                queue[0] = value;
-                queue[1] = value;
-                queue[2] = value;
-                queue[3] = value;
-                queue[4] = value;
-                queue[5] = value;
-                queue[6] = value;
-                queue[7] = value;
-                queue[8] = value;
-                queue[9] = value;
-                queue[10] = value;
-                queue[11] = value;
-                queue[12] = value;
-                queue[13] = value;
-                queue[14] = value;
-                queue[15] = value;
-            }
-
-            // Perform the actual memset.
-            __asm__("pref @%0" : : "r"(queue));
-            queue += 8;
-            actual_copy_addr += 32;
-        }
-
-        // Finally, attempt a new write to both queues in order to stall the CPU until the
-        // last write is done.
-        queue = (uint32_t *)STORE_QUEUE_BASE;
-        queue[0] = 0;
-        queue[8] = 0;
+        // Call the actual functionality now that we're guarded.
+        _hw_memset(addr, value, amount);
 
         // We held the lock and succeeded at memsetting.
         successful = 1;
@@ -314,6 +320,63 @@ int hw_memset(void *addr, uint32_t value, unsigned int amount)
     }
 
     return successful;
+}
+
+void _hw_memcpy(void *dest, void *src, unsigned int amount)
+{
+    // Set the base queue address pointer to the queue location with destination bits
+    // 25:5. The bottom bits should be all 0s since hw_memset requires an alignment
+    // to a 32 byte boundary. We will use both queue areas since SQ0/SQ1 specification
+    // is the same bit as destination bit 5. Technically this means the below queue setup
+    // interleaves the data between the two queues, but it really does not matter what
+    // order the hardware copies things.
+    uint32_t *srcptr = (uint32_t *)src;
+    uint32_t *queue = (uint32_t *)(STORE_QUEUE_BASE | (((uint32_t)dest) & 0x03FFFFE0));
+    uint32_t actual_copy_dest = (uint32_t)dest;
+    uint32_t stop_copy_dest = actual_copy_dest + (amount & 0xFFFFFFE0);
+    uint32_t stored_dest_bits = (actual_copy_dest >> 24) & 0x1C;
+
+    // Set the top address bits (28:26) into the store queue address control registers.
+    QACR0 = stored_dest_bits;
+    QACR1 = stored_dest_bits;
+
+    // Now, trigger the hardware to copy the values from the queue to the address we
+    // care about, triggering one 32-byte prefetch at a time.
+    while (actual_copy_dest != stop_copy_dest)
+    {
+        // Make sure we don't wrap around if we were near a memory border.
+        if (((actual_copy_dest >> 24) & 0x1C) != stored_dest_bits)
+        {
+            // Re-init the top address control registers and the queue.
+            stored_dest_bits = (actual_copy_dest >> 24) & 0x1C;
+            QACR0 = stored_dest_bits;
+            QACR1 = stored_dest_bits;
+        }
+
+        // First, prefetch the bytes we will need in the next cycle.
+        __asm__("pref @%0" : : "r"(srcptr + 8));
+
+        // Now, load the destination queue with the next 32 bytes from the source.
+        queue[0] = *srcptr++;
+        queue[1] = *srcptr++;
+        queue[2] = *srcptr++;
+        queue[3] = *srcptr++;
+        queue[4] = *srcptr++;
+        queue[5] = *srcptr++;
+        queue[6] = *srcptr++;
+        queue[7] = *srcptr++;
+
+        // Finally, trigger the store of this data
+        __asm__("pref @%0" : : "r"(queue));
+        queue += 8;
+        actual_copy_dest += 32;
+    }
+
+    // Finally, attempt a new write to both queues in order to stall the CPU until the
+    // last write is done.
+    queue = (uint32_t *)STORE_QUEUE_BASE;
+    queue[0] = 0;
+    queue[8] = 0;
 }
 
 int hw_memcpy(void *dest, void *src, unsigned int amount)
@@ -338,60 +401,8 @@ int hw_memcpy(void *dest, void *src, unsigned int amount)
     int successful = 0;
     if (mutex_try_lock(&queue_mutex))
     {
-
-        // Set the base queue address pointer to the queue location with destination bits
-        // 25:5. The bottom bits should be all 0s since hw_memset requires an alignment
-        // to a 32 byte boundary. We will use both queue areas since SQ0/SQ1 specification
-        // is the same bit as destination bit 5. Technically this means the below queue setup
-        // interleaves the data between the two queues, but it really does not matter what
-        // order the hardware copies things.
-        uint32_t *srcptr = (uint32_t *)src;
-        uint32_t *queue = (uint32_t *)(STORE_QUEUE_BASE | (((uint32_t)dest) & 0x03FFFFE0));
-        uint32_t actual_copy_dest = (uint32_t)dest;
-        uint32_t stop_copy_dest = actual_copy_dest + (amount & 0xFFFFFFE0);
-        uint32_t stored_dest_bits = (actual_copy_dest >> 24) & 0x1C;
-
-        // Set the top address bits (28:26) into the store queue address control registers.
-        QACR0 = stored_dest_bits;
-        QACR1 = stored_dest_bits;
-
-        // Now, trigger the hardware to copy the values from the queue to the address we
-        // care about, triggering one 32-byte prefetch at a time.
-        while (actual_copy_dest != stop_copy_dest)
-        {
-            // Make sure we don't wrap around if we were near a memory border.
-            if (((actual_copy_dest >> 24) & 0x1C) != stored_dest_bits)
-            {
-                // Re-init the top address control registers and the queue.
-                stored_dest_bits = (actual_copy_dest >> 24) & 0x1C;
-                QACR0 = stored_dest_bits;
-                QACR1 = stored_dest_bits;
-            }
-
-            // First, prefetch the bytes we will need in the next cycle.
-            __asm__("pref @%0" : : "r"(srcptr + 8));
-
-            // Now, load the destination queue with the next 32 bytes from the source.
-            queue[0] = *srcptr++;
-            queue[1] = *srcptr++;
-            queue[2] = *srcptr++;
-            queue[3] = *srcptr++;
-            queue[4] = *srcptr++;
-            queue[5] = *srcptr++;
-            queue[6] = *srcptr++;
-            queue[7] = *srcptr++;
-
-            // Finally, trigger the store of this data
-            __asm__("pref @%0" : : "r"(queue));
-            queue += 8;
-            actual_copy_dest += 32;
-        }
-
-        // Finally, attempt a new write to both queues in order to stall the CPU until the
-        // last write is done.
-        queue = (uint32_t *)STORE_QUEUE_BASE;
-        queue[0] = 0;
-        queue[8] = 0;
+        // Call the actual functionality now that we're guarded.
+        _hw_memcpy(dest, src, amount);
 
         // We held the lock and succeeded at memsetting.
         successful = 1;
@@ -399,6 +410,16 @@ int hw_memcpy(void *dest, void *src, unsigned int amount)
     }
 
     return successful;
+}
+
+void _queue_exclusive_request()
+{
+    mutex_lock(&queue_mutex);
+}
+
+void _queue_exclusive_release()
+{
+    mutex_unlock(&queue_mutex);
 }
 
 void call_unmanaged(void (*call)())

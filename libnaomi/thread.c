@@ -22,6 +22,8 @@ typedef struct
     uint32_t current;
     uint32_t irq_disabled;
     int others_waiting;
+    uint32_t heldby;
+    int recursive_count;
 } semaphore_internal_t;
 
 static semaphore_internal_t *semaphores[MAX_SEM_AND_MUTEX];
@@ -804,6 +806,11 @@ int _thread_wake_waiting_semaphore(semaphore_internal_t *semaphore)
             {
                 // No more slots to acquire, exit before we wake up any
                 // additional threads.
+                if (semaphore->type == SEM_TYPE_MUTEX)
+                {
+                    semaphore->heldby = threads[i]->id;
+                    semaphore->recursive_count = 0;
+                }
                 break;
             }
         }
@@ -1300,17 +1307,31 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
             semaphore_internal_t *semaphore = _semaphore_find(handle, current->gp_regs[5]);
             if (semaphore)
             {
-                if (semaphore->current > 0)
-                {
-                    // Safely can acquire this.
-                    semaphore->current -= 1;
-                    semaphore->irq_disabled = 0;
-                }
-                else
-                {
-                    thread_t *thread = (thread_t *)current->threadptr;
+                thread_t *thread = (thread_t *)current->threadptr;
 
-                    if (thread)
+                if (thread)
+                {
+                    if (semaphore->current > 0)
+                    {
+                        // Safely can acquire this.
+                        semaphore->current -= 1;
+                        semaphore->irq_disabled = 0;
+
+                        // If we acquired it and we're a mutex, remember that we were
+                        // the thread that acquired it. This lets us support recursive
+                        // mutexes.
+                        if (semaphore->current == 0 && semaphore->type == SEM_TYPE_MUTEX)
+                        {
+                            semaphore->heldby = thread->id;
+                            semaphore->recursive_count = 0;
+                        }
+                    }
+                    else if (semaphore->type == SEM_TYPE_MUTEX && semaphore->heldby == thread->id)
+                    {
+                        // We recursively locked, so just increase the recursive count.
+                        semaphore->recursive_count ++;
+                    }
+                    else
                     {
                         // Semaphore is used up, park ourselves until its ready.
                         _thread_check_waiting(thread);
@@ -1321,11 +1342,11 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
                         // Track how many other threads are waiting for this semaphore.
                         semaphore->others_waiting++;
                     }
-                    else
-                    {
-                        // Should never happen.
-                        _irq_display_exception(SIGABRT, current, "cannot locate thread object", which);
-                    }
+                }
+                else
+                {
+                    // Should never happen.
+                    _irq_display_exception(SIGABRT, current, "cannot locate thread object", which);
                 }
             }
             else
@@ -1347,22 +1368,58 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
             semaphore_internal_t *semaphore = _semaphore_find(handle, current->gp_regs[5]);
             if (semaphore)
             {
-                // Safely restore this.
-                semaphore->current += 1;
-
-                if (semaphore->current > semaphore->max)
+                int should_unlock = 1;
+                if (semaphore->type == SEM_TYPE_MUTEX)
                 {
-                    uint32_t id = handle ? handle->id : 0;
-                    char *msg = current->gp_regs[5] == SEM_TYPE_SEMAPHORE ?
-                        "attempt release unowned semaphore" :
-                        "attempt release unowned mutex";
-                    _irq_display_exception(SIGABRT, current, msg, id);
+                    thread_t *thread = (thread_t *)current->threadptr;
+
+                    if (thread)
+                    {
+                        if (semaphore->heldby != thread->id)
+                        {
+                            uint32_t id = handle ? handle->id : 0;
+                            _irq_display_exception(SIGABRT, current, "attempt release unowned mutex", id);
+                        }
+                        else if (semaphore->recursive_count > 0)
+                        {
+                            // Just decrease the count, we recursively locked.
+                            semaphore->recursive_count --;
+                            should_unlock = 0;
+                        }
+                        else
+                        {
+                            // Reset this, just for bookkeeping.
+                            semaphore->heldby = 0;
+                            semaphore->recursive_count = 0;
+                        }
+                    }
+                    else
+                    {
+                        // Should never happen.
+                        _irq_display_exception(SIGABRT, current, "cannot locate thread object", which);
+                    }
                 }
 
-                // Wake up any other threads that were waiting on this thread for a join.
-                if (_thread_wake_waiting_semaphore(semaphore))
+                // Only actually release to other threads if we didn't recursively unlock.
+                if (should_unlock)
                 {
-                    schedule = THREAD_SCHEDULE_OTHER;
+                    // Safely restore this.
+                    semaphore->current += 1;
+
+                    if (semaphore->current > semaphore->max)
+                    {
+                        uint32_t id = handle ? handle->id : 0;
+                        char *msg = current->gp_regs[5] == SEM_TYPE_SEMAPHORE ?
+                            "attempt release unowned semaphore" :
+                            "attempt release unowned mutex";
+                        _irq_display_exception(SIGABRT, current, msg, id);
+                    }
+
+                    // Wake up any other threads that were waiting on this thread for a join.
+                    if (_thread_wake_waiting_semaphore(semaphore))
+                    {
+                        schedule = THREAD_SCHEDULE_OTHER;
+                    }
                 }
             }
             else
@@ -1624,6 +1681,8 @@ void semaphore_init(semaphore_t *semaphore, uint32_t initial_value)
                 internal->max = initial_value;
                 internal->current = initial_value;
                 internal->others_waiting = 0;
+                internal->heldby = 0;
+                internal->recursive_count = 0;
 
                 // Put it in our registry.
                 semaphores[slot] = internal;
@@ -1769,6 +1828,8 @@ void mutex_init(mutex_t *mutex)
                 internal->max = 1;
                 internal->current = 1;
                 internal->others_waiting = 0;
+                internal->heldby = 0;
+                internal->recursive_count = 0;
 
                 // Put it in our registry.
                 semaphores[slot] = internal;
@@ -1802,11 +1863,20 @@ int mutex_try_lock(mutex_t *mutex)
             {
                 acquired = 1;
                 semaphores[slot]->current --;
+                semaphores[slot]->heldby = current_thread_id;
+                semaphores[slot]->recursive_count = 0;
 
                 // Keep track of whether this was acquired with interrupts disabled or not.
                 // This is because if it was, the subsequent unlock must be done without
                 // syscalls as well.
                 semaphores[slot]->irq_disabled = _irq_is_disabled(old_interrupts);
+            }
+            else if (semaphores[slot]->heldby == current_thread_id)
+            {
+                // This is a recursively acquired mutex, don't deadlock, since we have the
+                // resource already.
+                acquired = 1;
+                semaphores[slot]->recursive_count ++;
             }
         }
     }
@@ -1834,11 +1904,20 @@ void mutex_lock(mutex_t * mutex)
             {
                 acquired = 1;
                 semaphores[slot]->current --;
+                semaphores[slot]->heldby = current_thread_id;
+                semaphores[slot]->recursive_count = 0;
 
                 // Keep track of whether this was acquired with interrupts disabled or not.
                 // This is because if it was, the subsequent unlock must be done without
                 // syscalls as well.
                 semaphores[slot]->irq_disabled = irq_disabled;
+            }
+            else if (semaphores[slot]->heldby == current_thread_id)
+            {
+                // This is a recursively acquired mutex, don't deadlock, since we have the
+                // resource already.
+                acquired = 1;
+                semaphores[slot]->recursive_count ++;
             }
         }
     }
@@ -1874,11 +1953,26 @@ void mutex_unlock(mutex_t * mutex)
             semaphores[slot] != 0 &&
             semaphores[slot]->id == mutex->id &&
             semaphores[slot]->type == SEM_TYPE_MUTEX &&
-            (semaphores[slot]->irq_disabled || semaphores[slot]->others_waiting == 0)
+            (semaphores[slot]->irq_disabled || semaphores[slot]->others_waiting == 0 || semaphores[slot]->recursive_count > 0)
         ) {
-            // Unlock the mutex, exit without doing a syscall.
-            semaphores[slot]->current ++;
-            semaphores[slot]->irq_disabled = 0;
+            if (semaphores[slot]->heldby != current_thread_id)
+            {
+                // Releasing a mutex we don't own?
+                _irq_display_invariant("mutex failure", "attempt release unowned mutex %lu", mutex->id);
+            }
+            else if (semaphores[slot]->recursive_count > 0)
+            {
+                // Recursively locked, just decrease the count.
+                semaphores[slot]->recursive_count --;
+            }
+            else
+            {
+                // Unlock the mutex, exit without doing a syscall.
+                semaphores[slot]->current ++;
+                semaphores[slot]->irq_disabled = 0;
+                semaphores[slot]->heldby = 0;
+                semaphores[slot]->recursive_count = 0;
+            }
 
             irq_restore(old_interrupts);
             return;

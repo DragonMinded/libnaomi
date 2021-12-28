@@ -13,6 +13,12 @@
 #define WAITING_LIST_TRANSPARENT 0x2
 #define WAITING_LIST_PUNCHTHRU 0x4
 
+/* Prototypes for faster access to store queues. */
+void _queue_exclusive_request();
+void _queue_exclusive_release();
+void _hw_memcpy(void *dest, void *src, unsigned int amount);
+void _hw_memset(void *addr, uint32_t value, unsigned int amount);
+
 /* What lists we populated and need to wait to finish filling. */
 static unsigned int waiting_lists = 0;
 
@@ -22,10 +28,18 @@ static unsigned int populated_lists = 0;
 /* The background color as set by a user when requesting a different background. */
 static uint32_t ta_background_color = 0;
 
+/* Whether we are inside a list commit or not */
+static int ta_committing_list = 0;
+
 /* Send a command, with len equal to either TA_LIST_SHORT or TA_LIST_LONG
  * for either 32 or 64 byte TA commands. */
 void ta_commit_list(void *src, int len)
 {
+    if (!ta_committing_list)
+    {
+        _irq_display_invariant("display list failure", "cannot send lists outside of a ta_commit_begin() section!");
+    }
+
     /* Figure out what kind of command this is so we can set up to wait for
      * it to be finished loading properly. */
     uint32_t command = ((uint32_t *)src)[0];
@@ -77,7 +91,8 @@ void ta_commit_list(void *src, int len)
         }
     }
 
-    hw_memcpy((void *)0xB0000000, src, len);
+    // We already got the exclusive lock, so use the faster, non-guarded version.
+    _hw_memcpy((void *)0xB0000000, src, len);
 }
 
 struct ta_buffers
@@ -410,9 +425,13 @@ void ta_commit_begin()
         _ta_set_target(&ta_working_buffers, global_video_width / 32, global_video_height / 32);
     }
 
+    // Need exclusive store queue access.
+    _queue_exclusive_request();
+
     // We are not waiting on anything, we will find out what we're about to wait on
     // as soon as we get a list through ta_commit_list().
     waiting_lists = 0;
+    ta_committing_list = 1;
 }
 
 /* Send the special end of list command to signify done sending display
@@ -421,7 +440,11 @@ void ta_commit_end()
 {
     /* Avoid going through the TA command lookup */
     unsigned int words[8] = { 0 };
-    hw_memcpy((void *)0xB0000000, words, TA_LIST_SHORT);
+    _hw_memcpy((void *)0xB0000000, words, TA_LIST_SHORT);
+
+    // Done with the store queues */
+    ta_committing_list = 0;
+    _queue_exclusive_release();
 
     if (_irq_is_disabled(_irq_get_sr()))
     {

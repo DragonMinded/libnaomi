@@ -47,7 +47,10 @@ void semaphore_free(semaphore_t *semaphore);
 // while interrupts are disabled and you successfully acquire the lock, you must
 // not re-enable interrupts before calling mutex_unlock. mutex_lock() and mutex_unlock()
 // will cooperate with the thread scheduler if you are operating in a normal threaded
-// context.
+// context. Not also that you can recursively call mutex_lock() as mutexes support
+// recursive locking. So, within a single thread, you can lock and unlock a mutex
+// multiple times without deadlock. This also goes for mutex_trylock() which will
+// succeed if recursively called.
 #define MAX_MUTEXES 64
 
 typedef struct
