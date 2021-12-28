@@ -1589,6 +1589,62 @@ int closedir(DIR *dirp)
     }
 }
 
+// Prototypes and data structures for lazy GC to support pthread_detach().
+int _thread_can_join(uint32_t id);
+int _thread_can_destroy(uint32_t id);
+
+typedef struct pthread_detached
+{
+    uint32_t tid;
+    struct pthread_detached *next;
+} pthread_detached_t;
+
+pthread_detached_t *detach_head = NULL;
+
+void _pthread_gc()
+{
+    uint32_t old_irq = irq_disable();
+    pthread_detached_t *cur = detach_head;
+    pthread_detached_t *last = 0;
+    while (cur)
+    {
+        // See if we can join this thread.
+        if (_thread_can_join(cur->tid))
+        {
+            thread_join(cur->tid);
+        }
+
+        // See if we can nuke this thread entirely.
+        if (_thread_can_destroy(cur->tid))
+        {
+            thread_destroy(cur->tid);
+
+            // Remove the structure from our linked list.
+            pthread_detached_t *next = cur->next;
+            if (last)
+            {
+                last->next = next;
+            }
+            else
+            {
+                detach_head = next;
+            }
+
+            // Kill the structure that tracks it.
+            free(cur);
+            cur = next;
+        }
+        else
+        {
+            // Just go to the next spot.
+            last = cur;
+            cur = cur->next;
+        }
+    }
+
+    irq_restore(old_irq);
+}
+
 int pthread_create(
     pthread_t *pthread,
     const pthread_attr_t *attr,
@@ -1600,6 +1656,7 @@ int pthread_create(
         // I'm not sure if we'll ever support these attributes. Its a lot of
         // extra work to inform the thread system and I'm not sure of the
         // benefits.
+        _pthread_gc();
         return EINVAL;
     }
 
@@ -1608,29 +1665,97 @@ int pthread_create(
     {
         *pthread = (pthread_t)new_thread;
         thread_start(new_thread);
+        _pthread_gc();
         return 0;
     }
     else
     {
+        _pthread_gc();
         return EAGAIN;
     }
 }
 
 int pthread_join(pthread_t pthread, void **value_ptr)
 {
+    uint32_t old_irq = irq_disable();
     if (thread_info((uint32_t)pthread, NULL))
     {
-        void *ret = thread_join((uint32_t)pthread);
-        thread_destroy((uint32_t)pthread);
-        if (value_ptr)
+        // Verify that it is joinable.
+        int retval = 0;
+        pthread_detached_t *cur = detach_head;
+        while (cur)
         {
-            *value_ptr = ret;
+            if (cur->tid == (uint32_t)pthread)
+            {
+                // Thread is not joinable, it has been detached!
+                retval = EINVAL;
+                break;
+            }
+
+            cur = cur->next;
         }
 
-        return 0;
+        // Join and destroy the thread if it is joinable.
+        irq_restore(old_irq);
+        if (retval == 0)
+        {
+            void *ret = thread_join((uint32_t)pthread);
+            thread_destroy((uint32_t)pthread);
+            if (value_ptr)
+            {
+                *value_ptr = ret;
+            }
+        }
+
+        _pthread_gc();
+        return retval;
     }
     else
     {
+        irq_restore(old_irq);
+        _pthread_gc();
+        return ESRCH;
+    }
+}
+
+int pthread_detach(pthread_t pthread)
+{
+    uint32_t old_irq = irq_disable();
+    if (thread_info((uint32_t)pthread, NULL))
+    {
+        int retval = 0;
+        pthread_detached_t *cur = detach_head;
+        while (cur)
+        {
+            if (cur->tid == (uint32_t)pthread)
+            {
+                // Thread has already been detached!
+                retval = EINVAL;
+                break;
+            }
+
+            cur = cur->next;
+        }
+
+        if (retval == 0)
+        {
+            // Create a new entry for this thread to be auto-cleaned.
+            pthread_detached_t *new = malloc(sizeof(pthread_detached_t));
+            new->tid = (uint32_t)pthread;
+            new->next = detach_head;
+
+            // Slot it into the structure.
+            detach_head = new;
+        }
+
+        irq_restore(old_irq);
+        _pthread_gc();
+        return retval;
+    }
+    else
+    {
+        irq_restore(old_irq);
+        _pthread_gc();
         return ESRCH;
     }
 }
@@ -1643,4 +1768,16 @@ pthread_t pthread_self(void)
 int pthread_equal(pthread_t t1, pthread_t t2)
 {
     return (uint32_t)t1 == (uint32_t)t2;
+}
+
+void pthread_yield (void)
+{
+    _pthread_gc();
+    thread_yield();
+}
+
+void pthread_exit (void *value_ptr)
+{
+    thread_exit(value_ptr);
+    __builtin_unreachable();
 }

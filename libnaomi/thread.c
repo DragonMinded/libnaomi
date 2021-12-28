@@ -152,6 +152,34 @@ thread_t *_thread_find_by_id(uint32_t id)
     return 0;
 }
 
+int _thread_can_join(uint32_t id)
+{
+    int retval = 0;
+    uint32_t old_irq = irq_disable();
+    thread_t *thd = _thread_find_by_id(id);
+    if (thd)
+    {
+        retval = thd->state == THREAD_STATE_FINISHED;
+    }
+
+    irq_restore(old_irq);
+    return retval;
+}
+
+int _thread_can_destroy(uint32_t id)
+{
+    int retval = 0;
+    uint32_t old_irq = irq_disable();
+    thread_t *thd = _thread_find_by_id(id);
+    if (thd)
+    {
+        retval = thd->state == THREAD_STATE_ZOMBIE;
+    }
+
+    irq_restore(old_irq);
+    return retval;
+}
+
 uint32_t _thread_current_id(irq_state_t *cur_state)
 {
     thread_t *current_thread = (thread_t *)cur_state->threadptr;
