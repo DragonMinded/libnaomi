@@ -3,6 +3,7 @@
 #include <string.h>
 #include <limits.h>
 #include <sys/signal.h>
+#include <sys/errno.h>
 #include "naomi/interrupt.h"
 #include "naomi/thread.h"
 #include "naomi/timer.h"
@@ -52,6 +53,9 @@ semaphore_internal_t *_semaphore_find(void * semaphore, unsigned int type)
     return 0;
 }
 
+// Thread-local variables that we save/restore every context switch.
+static uint32_t current_thread_id = 0;
+
 // Thread hasn't been started yet, or thread_stop() was called on thread.
 #define THREAD_STATE_STOPPED 0
 
@@ -81,6 +85,7 @@ typedef struct
     uint32_t id;
     int priority;
     int state;
+    int saved_errno;
 
     // State for priority bumping and real-time threads.
     int priority_bump;
@@ -292,6 +297,7 @@ void _thread_register_main(irq_state_t *state)
     main_thread->context = state;
     main_thread->state = THREAD_STATE_RUNNING;
     state->threadptr = main_thread;
+    current_thread_id = main_thread->id;
 
     irq_restore(old_interrupts);
 }
@@ -451,6 +457,9 @@ irq_state_t *_thread_schedule(irq_state_t *state, int request)
         return state;
     }
 
+    // Save thread-local stuff.
+    current_thread->saved_errno = errno;
+
     // Schedule a new thread at this point.
     if (request == THREAD_SCHEDULE_CURRENT)
     {
@@ -459,6 +468,8 @@ irq_state_t *_thread_schedule(irq_state_t *state, int request)
         if (current_thread->state == THREAD_STATE_RUNNING && current_thread->priority != IDLE_THREAD_PRIORITY)
         {
             // It is, just return it.
+            errno = current_thread->saved_errno;
+            current_thread_id = current_thread->id;
             return current_thread->context;
         }
     }
@@ -545,6 +556,8 @@ irq_state_t *_thread_schedule(irq_state_t *state, int request)
             // Okay, we found our current thread last iteration, so this is
             // the next applicable thread in a round-robin scheduler.
             last_thread->last_thread = threads[i]->id;
+            errno = threads[i]->saved_errno;
+            current_thread_id = threads[i]->id;
             return threads[i]->context;
         }
 
@@ -565,6 +578,8 @@ irq_state_t *_thread_schedule(irq_state_t *state, int request)
     {
         // Okay, we found an applicable thread, return it as the scheduled thread.
         last_thread->last_thread = first_thread->id;
+        errno = first_thread->saved_errno;
+        current_thread_id = first_thread->id;
         return first_thread->context;
     }
 
@@ -588,6 +603,7 @@ void _thread_init()
     last_second_interruptions = 0;
     highest_thread = 0;
     threads_disabled = 0;
+    current_thread_id = 0;
     memset(global_counters, 0, sizeof(uint32_t *) * MAX_GLOBAL_COUNTERS);
     memset(semaphores, 0, sizeof(semaphore_internal_t *) * MAX_SEM_AND_MUTEX);
     memset(threads, 0, sizeof(thread_t *) * MAX_THREADS);
@@ -654,6 +670,7 @@ void _thread_free()
     round_robin_count = 0;
     global_semaphore_count = 0;
     global_mutex_count = 0;
+    current_thread_id = 0;
 
     irq_restore(old_interrupts);
 }
@@ -1201,16 +1218,8 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
         }
         case 7:
         {
-            // thread_id
-            thread_t *thread = (thread_t *)current->threadptr;
-            if (thread)
-            {
-                current->gp_regs[0] = thread->id;
-            }
-            else
-            {
-                _irq_display_exception(SIGABRT, current, "cannot locate thread object", which);
-            }
+            // This was thread_id, but this became a threadlocal.
+            _irq_display_exception(SIGABRT, current, "thread_id syscall is no longer implemented!", which);
             break;
         }
         case 8:
@@ -2022,9 +2031,7 @@ void thread_yield()
 
 uint32_t thread_id()
 {
-    register uint32_t syscall_return asm("r0");
-    asm("trapa #7" : "=r" (syscall_return));
-    return syscall_return;
+    return current_thread_id;
 }
 
 void * thread_join(uint32_t tid)

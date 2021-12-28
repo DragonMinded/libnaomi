@@ -1,6 +1,7 @@
 // vim: set fileencoding=utf-8
 #include <stdlib.h>
 #include <math.h>
+#include <sys/errno.h>
 #include "naomi/thread.h"
 
 void *basic_thread(void *param)
@@ -245,4 +246,51 @@ void test_threads_sleep(test_context_t *context)
 
     ASSERT(time_spent > 250000, "Did not wait enough time (%lu) in thread!", time_spent);
     ASSERT(time_spent < 251000, "Spent too much time (%lu) bookkeeping!", time_spent);
+}
+
+typedef struct
+{
+    int req_errno;
+    void *counter;
+} errno_thread_t;
+
+void *errno_thread(void *param)
+{
+    errno_thread_t *thd = (errno_thread_t *)param;
+
+    errno = (int)thd->req_errno;
+    global_counter_increment(thd->counter);
+
+    while (global_counter_value(thd->counter) != 2) { ; }
+
+    return (void *)errno;
+}
+
+void test_threads_errno(test_context_t *context)
+{
+    // Set up local data for 2 threads, make them set their errno to different values.
+    errno_thread_t thd[2];
+    thd[0].req_errno = 1234;
+    thd[1].req_errno = 5678;
+    errno = 1337;
+
+    // Set up one global counter so we know when its safe to exit the threads.
+    thd[0].counter = global_counter_init(0);
+    thd[1].counter = thd[0].counter;
+
+    uint32_t thread1 = thread_create("errno1", errno_thread, &thd[0]);
+    uint32_t thread2 = thread_create("errno2", errno_thread, &thd[1]);
+
+    thread_start(thread1);
+    thread_start(thread2);
+
+    int errno1 = (int)thread_join(thread1);
+    int errno2 = (int)thread_join(thread2);
+
+    thread_destroy(thread1);
+    thread_destroy(thread2);
+
+    ASSERT(errno == 1337, "Another thread changed our errno!");
+    ASSERT(errno1 == 1234, "Thread 1 had its errno changed!");
+    ASSERT(errno2 == 5678, "Thread 2 had its errno changed!");
 }
