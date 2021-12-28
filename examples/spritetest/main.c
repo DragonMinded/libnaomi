@@ -1,3 +1,4 @@
+#include <string.h>
 #include <naomi/video.h>
 #include <naomi/ta.h>
 #include <naomi/font.h>
@@ -5,9 +6,9 @@
 #include <naomi/sprite/sprite.h>
 
 #ifdef FEATURE_FREETYPE
-#define draw_text ta_draw_text
+#define draw_text(x, y, font, color, msg...) ta_draw_text(x, y, font, color, msg)
 #else
-#define draw_text video_draw_text
+#define draw_text(x, y, font, color, msg...) video_draw_debug_text(x, y, color, msg)
 #endif
 
 #define MAXPAGES 3
@@ -228,8 +229,12 @@ void main()
         sprite_draw_box(32, video_height() - 32, video_width() - 32, video_height() - 64, rgb(255, 255, 255));
 
         char instructions[] = "press arrow keys to change demo screen";
+#ifdef FEATURE_FREETYPE
         font_metrics_t metrics = font_get_text_metrics(font, instructions);
         int instwidth = metrics.width + 40;
+#else
+        int instwidth = (strlen(instructions) * 8) + 40;
+#endif
 
         sprite_draw_simple((video_width() - instwidth) / 2, video_height() - 64 + 8, leftarrow);
         sprite_draw_simple(((video_width() - instwidth) / 2) + 20, video_height() - 64 + 8, rightarrow);
