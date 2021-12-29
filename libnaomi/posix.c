@@ -1589,6 +1589,108 @@ int closedir(DIR *dirp)
     }
 }
 
+int pthread_attr_init(pthread_attr_t *attr)
+{
+    memset(attr, 0, sizeof(pthread_attr_t));
+    attr->is_initialized = 1;
+    attr->stacksize = THREAD_STACK_SIZE;
+    attr->detachstate = PTHREAD_CREATE_JOINABLE;
+    attr->contentionscope = PTHREAD_SCOPE_SYSTEM;
+    return 0;
+}
+
+int pthread_attr_destroy(pthread_attr_t *attr)
+{
+    attr->is_initialized = 0;
+    return 0;
+}
+
+int pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr, size_t stacksize)
+{
+    // We don't support changing the stack address.
+    return EINVAL;
+}
+
+int pthread_attr_getstack(const pthread_attr_t *attr, void **stackaddr, size_t *stacksize)
+{
+    if (stackaddr)
+    {
+        *stackaddr = attr->stackaddr;
+    }
+    if (stacksize)
+    {
+        *stacksize = attr->stacksize;
+    }
+    return 0;
+}
+
+int pthread_attr_getstacksize(const pthread_attr_t *attr, size_t *stacksize)
+{
+    if (stacksize)
+    {
+        *stacksize = attr->stacksize;
+    }
+    return 0;
+}
+
+int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
+{
+    if (stacksize != THREAD_STACK_SIZE)
+    {
+        // Don't support changing stack size!
+        return EINVAL;
+    }
+    attr->stacksize = stacksize;
+    return 0;
+}
+
+int pthread_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
+{
+    if (stackaddr)
+    {
+        *stackaddr = attr->stackaddr;
+    }
+    return 0;
+}
+
+int pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr)
+{
+    if (stackaddr != 0)
+    {
+        // Don't support changing stack address!
+        return EINVAL;
+    }
+    attr->stackaddr = stackaddr;
+    return 0;
+}
+
+int pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
+{
+    if (detachstate)
+    {
+        *detachstate = attr->detachstate;
+    }
+    return 0;
+}
+
+int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate)
+{
+    attr->detachstate = detachstate;
+    return 0;
+}
+
+int pthread_attr_getguardsize(const pthread_attr_t *attr, size_t *guardsize)
+{
+    // Don't have any support for this at all, not even in the datatype.
+    return EINVAL;
+}
+
+int pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
+{
+    // Don't have any support for this at all, not even in the datatype.
+    return EINVAL;
+}
+
 // Prototypes and data structures for lazy GC to support pthread_detach().
 int _thread_can_join(uint32_t id);
 int _thread_can_destroy(uint32_t id);
@@ -1651,18 +1753,45 @@ int pthread_create(
     void *(*start_routine)(void *),
     void *arg
 ) {
+    int create_detached = 0;
+
     if (attr)
     {
-        // I'm not sure if we'll ever support these attributes. Its a lot of
-        // extra work to inform the thread system and I'm not sure of the
-        // benefits.
-        _pthread_gc();
-        return EINVAL;
+        if (attr->is_initialized == 0)
+        {
+            return EINVAL;
+        }
+        if (attr->stackaddr != 0)
+        {
+            return EINVAL;
+        }
+        if (attr->stacksize != THREAD_STACK_SIZE)
+        {
+            return EINVAL;
+        }
+        if (attr->contentionscope != PTHREAD_SCOPE_SYSTEM)
+        {
+            return EINVAL;
+        }
+
+        // Only attribute we really support right now.
+        create_detached = attr->detachstate == PTHREAD_CREATE_DETACHED;
     }
 
     uint32_t new_thread = thread_create("pthread", start_routine, arg);
     if (new_thread)
     {
+        if (create_detached)
+        {
+            // Create a new entry for this thread to be auto-cleaned.
+            pthread_detached_t *new = malloc(sizeof(pthread_detached_t));
+            new->tid = new_thread;
+            new->next = detach_head;
+
+            // Slot it into the structure.
+            detach_head = new;
+        }
+
         *pthread = (pthread_t)new_thread;
         thread_start(new_thread);
         _pthread_gc();
@@ -1798,4 +1927,47 @@ int pthread_getconcurrency(void)
 {
     // We don't support concurrency levels, since we are single-cored.
     return EINVAL;
+}
+
+int pthread_atfork(void (*prepare)(void), void (*parent)(void), void (*child)(void))
+{
+    // We don't suppor fork(), so don't bother supporting this.
+    return EINVAL;
+}
+
+int pthread_getattr_np(pthread_t id, pthread_attr_t *attr)
+{
+    uint32_t old_irq = irq_disable();
+    int retval = 0;
+
+    if (thread_info((uint32_t)id, NULL))
+    {
+        memset(attr, 0, sizeof(pthread_attr_t));
+        attr->is_initialized = 1;
+        attr->stacksize = THREAD_STACK_SIZE;
+        attr->contentionscope = PTHREAD_SCOPE_SYSTEM;
+        attr->detachstate = PTHREAD_CREATE_JOINABLE;
+
+        // Figure out if it is joinable or detached.
+        pthread_detached_t *cur = detach_head;
+        while (cur)
+        {
+            if (cur->tid == (uint32_t)id)
+            {
+                // Thread is not joinable, it is detachable instead.
+                attr->detachstate = PTHREAD_CREATE_DETACHED;
+                break;
+            }
+
+            cur = cur->next;
+        }
+    }
+    else
+    {
+        // Couldn't find thread.
+        retval = ESRCH;
+    }
+
+    irq_restore(old_irq);
+    return retval;
 }
