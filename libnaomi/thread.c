@@ -100,6 +100,11 @@ typedef struct
     uint32_t running_time_recent;
     float cpu_percentage;
 
+    // Cancellation state of the thread.
+    int cancellable;
+    int cancel_queued;
+    int cancel_async;
+
     // Any resources this thread is waiting on.
     semaphore_internal_t * waiting_semaphore;
     uint32_t waiting_thread;
@@ -285,6 +290,7 @@ thread_t *_thread_create(char *name, int priority)
             thread->id = thread_id;
             thread->priority = priority;
             thread->state = THREAD_STATE_STOPPED;
+            thread->cancellable = 1;
             strncpy(thread->name, name, 63);
 
             for (int i = 0; i < WAITING_TA_MAX; i++)
@@ -1194,7 +1200,16 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
                 int was_priority = _thread_disable_priority(thread);
                 was_priority |= _thread_disable_critical(thread);
 
-                if (!was_priority)
+                // See if the thread was cancelled, since this is a cancellation point.
+                if (thread->cancellable != 0 && thread->cancel_queued != 0)
+                {
+                    thread->cancel_queued = 0;
+                    thread->state = THREAD_STATE_FINISHED;
+                    thread->retval = THREAD_CANCELLED;
+                    _thread_wake_waiting_threadid(thread);
+                    schedule = THREAD_SCHEDULE_OTHER;
+                }
+                else if (!was_priority)
                 {
                     // Schedule another thread other than ourselves, unless we have no other choice.
                     schedule = THREAD_SCHEDULE_OTHER;
@@ -1253,8 +1268,57 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
         }
         case 7:
         {
-            // This was thread_id, but this became a threadlocal.
-            _irq_display_exception(SIGABRT, current, "thread_id syscall is no longer implemented!", which);
+            // thread_cancel
+            thread_t *thread = _thread_find_by_id(current->gp_regs[4]);
+            thread_t *myself = (thread_t *)current->threadptr;
+
+            if (thread)
+            {
+                switch(thread->state)
+                {
+                    case THREAD_STATE_STOPPED:
+                    case THREAD_STATE_RUNNING:
+                    case THREAD_STATE_WAITING:
+                    {
+                        // We check for the current thread being the one cancelled,
+                        // because if it is and it is not cancellable, it will never
+                        // become cancellable and thus will get "stuck".
+                        if (thread == myself || (thread->cancellable != 0 && thread->cancel_async != 0))
+                        {
+                            // Cancel it, it can be cancelled at any time.
+                            thread->state = THREAD_STATE_FINISHED;
+                            thread->retval = THREAD_CANCELLED;
+                            _thread_wake_waiting_threadid(thread);
+                        }
+                        else
+                        {
+                            // Queue it for cancellation, its either disabled
+                            // for cancellation or deferred until the thread
+                            // sleeps/yields.
+                            thread->cancel_queued = 1;
+                        }
+                        break;
+                    }
+                    case THREAD_STATE_FINISHED:
+                    {
+                        // Thread is already done! No need to cancel, it will be
+                        // joined on at a later time with the correct retval.
+                        break;
+                    }
+                    case THREAD_STATE_ZOMBIE:
+                    {
+                        // Thread was already waited on! Nothing to do here.
+                        break;
+                    }
+                }
+            }
+
+            // Only schedule somebody else if we cancelled ourselves.
+            if (thread == myself)
+            {
+                schedule = THREAD_SCHEDULE_OTHER;
+            }
+
             break;
         }
         case 8:
@@ -1468,14 +1532,26 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
             thread_t *thread = (thread_t *)current->threadptr;
             if (thread)
             {
-                // Put the thread to sleep, waiting for the number of us requested.
-                // Adjust that number based on how close to the periodic interrupt
-                // we are, since when it fires it will not necessarily have lasted
-                // the right amount of time for this particular timer.
-                _thread_check_waiting(thread);
-                thread->state = THREAD_STATE_WAITING;
-                thread->waiting_timer = current->gp_regs[4] + _thread_time_elapsed();
-                schedule = THREAD_SCHEDULE_OTHER;
+                // See if the thread was cancelled, since this is a cancellation point.
+                if (thread->cancellable != 0 && thread->cancel_queued != 0)
+                {
+                    thread->cancel_queued = 0;
+                    thread->state = THREAD_STATE_FINISHED;
+                    thread->retval = THREAD_CANCELLED;
+                    _thread_wake_waiting_threadid(thread);
+                    schedule = THREAD_SCHEDULE_OTHER;
+                }
+                else
+                {
+                    // Put the thread to sleep, waiting for the number of us requested.
+                    // Adjust that number based on how close to the periodic interrupt
+                    // we are, since when it fires it will not necessarily have lasted
+                    // the right amount of time for this particular timer.
+                    _thread_check_waiting(thread);
+                    thread->state = THREAD_STATE_WAITING;
+                    thread->waiting_timer = current->gp_regs[4] + _thread_time_elapsed();
+                    schedule = THREAD_SCHEDULE_OTHER;
+                }
             }
             else
             {
@@ -1562,6 +1638,80 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
                 // Should never happen.
                 _irq_display_exception(SIGABRT, current, "cannot locate thread object", which);
             }
+            break;
+        }
+        case 16:
+        {
+            // thread_set_cancellable.
+            thread_t *thread = _thread_find_by_id(current->gp_regs[4]);
+
+            if (thread)
+            {
+                // Set the cancellable status, return the old status.
+                int cancellable = (int)current->gp_regs[5];
+                current->gp_regs[0] = (uint32_t)thread->cancellable;
+                thread->cancellable = cancellable;
+
+                // If the thread had a queued cancel during the time it was not cancellable,
+                // and the cancellation is asynchronous, then we need to cancel it at this point.
+                if (thread->cancellable != 0 && thread->cancel_queued != 0 && thread->cancel_async != 0)
+                {
+                    thread->cancel_queued = 0;
+                    thread->state = THREAD_STATE_FINISHED;
+                    thread->retval = THREAD_CANCELLED;
+                    _thread_wake_waiting_threadid(thread);
+                }
+            }
+            else
+            {
+                // Should never happen.
+                _irq_display_exception(SIGABRT, current, "cannot locate thread object", which);
+            }
+
+            // Only schedule somebody else if we cancelled ourselves.
+            thread_t *myself = (thread_t *)current->threadptr;
+            if (thread == myself)
+            {
+                schedule = THREAD_SCHEDULE_OTHER;
+            }
+
+            break;
+        }
+        case 17:
+        {
+            // thread_set_cancelasync.
+            thread_t *thread = _thread_find_by_id(current->gp_regs[4]);
+
+            if (thread)
+            {
+                // Set the cancellable status, return the old status.
+                int async = (int)current->gp_regs[5];
+                current->gp_regs[0] = (uint32_t)thread->cancel_async;
+                thread->cancel_async = async;
+
+                // If the thread had a queued cancel during the time it was not cancellable,
+                // then we need to cancel it at this point.
+                if (thread->cancellable != 0 && thread->cancel_queued != 0 && thread->cancel_async != 0)
+                {
+                    thread->cancel_queued = 0;
+                    thread->state = THREAD_STATE_FINISHED;
+                    thread->retval = THREAD_CANCELLED;
+                    _thread_wake_waiting_threadid(thread);
+                }
+            }
+            else
+            {
+                // Should never happen.
+                _irq_display_exception(SIGABRT, current, "cannot locate thread object", which);
+            }
+
+            // Only schedule somebody else if we cancelled ourselves.
+            thread_t *myself = (thread_t *)current->threadptr;
+            if (thread == myself)
+            {
+                schedule = THREAD_SCHEDULE_OTHER;
+            }
+
             break;
         }
         case 253:
@@ -2155,6 +2305,30 @@ void thread_yield()
 uint32_t thread_id()
 {
     return current_thread_id;
+}
+
+void thread_cancel(uint32_t tid)
+{
+    register uint32_t syscall_param0 asm("r4") = tid;
+    asm("trapa #7" : : "r" (syscall_param0));
+}
+
+int thread_set_cancellable(uint32_t tid, int cancellable)
+{
+    register uint32_t syscall_param0 asm("r4") = tid;
+    register int syscall_param1 asm("r5") = cancellable;
+    register int syscall_return asm("r0");
+    asm("trapa #16" : "=r" (syscall_return) : "r" (syscall_param0), "r" (syscall_param1));
+    return syscall_return;
+}
+
+int thread_set_cancelasync(uint32_t tid, int async)
+{
+    register uint32_t syscall_param0 asm("r4") = tid;
+    register int syscall_param1 asm("r5") = async;
+    register int syscall_return asm("r0");
+    asm("trapa #17" : "=r" (syscall_return) : "r" (syscall_param0), "r" (syscall_param1));
+    return syscall_return;
 }
 
 void * thread_join(uint32_t tid)

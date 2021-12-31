@@ -91,6 +91,11 @@ typedef struct
     float cpu_percentage;
 } thread_info_t;
 
+// Sentinel value returned by thread_join() if the thread was cancelled instead of exiting
+// cleanly (either by calling "return" in the thread's main, or by calling thread_exit() at
+// any time in the thread's execution stack).
+#define THREAD_CANCELLED ((void *)-1)
+
 // Create or destroy a thread object. Threads start in the stopped state and should only
 // ever be destroyed from the thread that they were created in. Never destroy a thread from
 // within the thread itself. If you wish to wait for a thread to complete and get its return
@@ -116,6 +121,26 @@ int thread_info(uint32_t tid, thread_info_t *info);
 void thread_priority(uint32_t tid, int priority);
 void thread_start(uint32_t tid);
 void thread_stop(uint32_t tid);
+
+// Thread cancellation support. Threads that are running but are cancelled will return
+// a value of THREAD_CANCELLED when joined against. This is different than thread_start()
+// and thread_stop() as those just enable or disable running of the thread, whereas this
+// will actively end a thread that is running with a sentinel value returned on a subsequent
+// thread_join() call. Note that you can set a thread as non-cancellable with the
+// thread_set_cancellable() function. If you do this, then any thread_cancel() call against
+// that thread will have no effect until the thread is later marked as cancellable again.
+// At that point, the thread will be immediately cancelled. Otherwise, a thread will be
+// cancelled when it yields or sleeps, so you can use those as cancellation points in your
+// thread. Note that if you set the thread as asynchronously cancellable with
+// thread_set_cancelasync(), then the thread can be cancelled at any time as long as it is
+// cancellable. In this way, you can choose whether a thread can be cancelled at all, and
+// if so, whether it should be cancelled immediately upon request or only when the thread
+// reaches a cancellation point. Note that both thread_set_cancellable() and
+// thread_set_cancelasync() will return the old value of the cancellable/async setting of
+// the thread when called.
+void thread_cancel(uint32_t tid);
+int thread_set_cancellable(uint32_t tid, int cancellable);
+int thread_set_cancelasync(uint32_t tid, int async);
 
 // Yield to the thread scheduler, which can choose a new thread to schedule. Also relinquishes
 // high-priority status if the current thread if it is designated high-priority.

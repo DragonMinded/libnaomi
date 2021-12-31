@@ -1832,7 +1832,7 @@ int pthread_join(pthread_t pthread, void **value_ptr)
             thread_destroy((uint32_t)pthread);
             if (value_ptr)
             {
-                *value_ptr = ret;
+                *value_ptr = (ret == THREAD_CANCELLED ? PTHREAD_CANCELED : ret);
             }
         }
 
@@ -1903,6 +1903,49 @@ void pthread_yield(void)
 {
     _pthread_gc();
     thread_yield();
+}
+
+void pthread_testcancel(void)
+{
+    _pthread_gc();
+    thread_yield();
+}
+
+int pthread_setcancelstate(int state, int *oldstate)
+{
+    int old = thread_set_cancellable(thread_id(), state == PTHREAD_CANCEL_ENABLE ? 1 : 0);
+    if (oldstate)
+    {
+        *oldstate = (old != 0 ? PTHREAD_CANCEL_ENABLE : PTHREAD_CANCEL_DISABLE);
+    }
+    return 0;
+}
+
+int pthread_setcanceltype(int type, int *oldtype)
+{
+    int old = thread_set_cancelasync(thread_id(), type == PTHREAD_CANCEL_ASYNCHRONOUS ? 1 : 0);
+    if (oldtype)
+    {
+        *oldtype = (old != 0 ? PTHREAD_CANCEL_ASYNCHRONOUS : PTHREAD_CANCEL_DEFERRED);
+    }
+    return 0;
+}
+
+int pthread_cancel(pthread_t pthread)
+{
+    uint32_t old_irq = irq_disable();
+    int retval = 0;
+    if (thread_info((uint32_t)pthread, NULL))
+    {
+        thread_cancel((uint32_t)pthread);
+        _pthread_gc();
+    }
+    else
+    {
+        retval = ESRCH;
+    }
+    irq_restore(old_irq);
+    return retval;
 }
 
 void pthread_exit(void *value_ptr)

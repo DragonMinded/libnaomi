@@ -398,3 +398,70 @@ void test_threads_mutex_recursive_lock(test_context_t *context)
     }
     mutex_free(&mutex);
 }
+
+void *thread_cancel_done_already(void *param)
+{
+    return (void *)12345;
+}
+
+void *thread_cancel_any_time(void *param)
+{
+    for (volatile unsigned int i = 0; i < 1000000; i++) { ; }
+    return (void *)23456;
+}
+
+void *thread_cancel_synchronous(void *param)
+{
+    timer_wait(100000);
+    thread_yield();
+    return (void *)34567;
+}
+
+void test_threads_cancellation(test_context_t *context)
+{
+    uint32_t thread;
+    void *retval;
+
+    // First, check that we can cancel an already done thread and get the
+    // original return value.
+    thread = thread_create("test", thread_cancel_done_already, NULL);
+    thread_start(thread);
+    thread_sleep(100000);
+    thread_cancel(thread);
+    retval = thread_join(thread);
+    thread_destroy(thread);
+    ASSERT(retval == (void *)12345, "Thread was cancelled when it should have ended naturally!");
+
+    // Now, check that we can cancel a thread with no cancellation points
+    // at any time as long as it is asynchronous.
+    thread = thread_create("test", thread_cancel_any_time, NULL);
+    thread_set_cancelasync(thread, 1);
+    thread_start(thread);
+    thread_sleep(2500);
+    thread_cancel(thread);
+    retval = thread_join(thread);
+    thread_destroy(thread);
+    ASSERT(retval == THREAD_CANCELLED, "Thread ended naturally when it should have been cancelled!");
+
+    // And check that if we don't set it as async cancel, that it ends naturally.
+    thread = thread_create("test", thread_cancel_any_time, NULL);
+    thread_start(thread);
+    thread_sleep(2500);
+    thread_cancel(thread);
+    retval = thread_join(thread);
+    thread_destroy(thread);
+    ASSERT(retval == (void *)23456, "Thread was cancelled when it should have ended naturally!");
+
+    // Now, check that we can cancel a thread with a cancellation point that is
+    // not asynchronous.
+    thread = thread_create("test", thread_cancel_synchronous, NULL);
+    int profile = profile_start();
+    thread_start(thread);
+    thread_sleep(2500);
+    thread_cancel(thread);
+    retval = thread_join(thread);
+    unsigned int duration = profile_end(profile);
+    thread_destroy(thread);
+    ASSERT(retval == THREAD_CANCELLED, "Thread ended naturally when it should have been cancelled!");
+    ASSERT(duration >= 100000, "Thread appears to have been async-cancelled instead of defer-cancelled!");
+}
