@@ -11,9 +11,9 @@ TOPLEVEL_MAKEFILE := $(abspath $(firstword $(MAKEFILE_LIST)))
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 
 # Set up common library path definitions.
-NAOMI_SH_INCLUDEPATHS  = -I${MAKEFILE_DIR}libnaomi/ -I${NAOMI_SH_BASE}/include -I${NAOMI_SH_BASE}/sh-elf/include
+NAOMI_SH_INCLUDEPATHS  = -I${MAKEFILE_DIR}libnaomi/ -I${MAKEFILE_DIR}libnaomi/overrides/ -I${NAOMI_SH_BASE}/include/ -I${NAOMI_SH_BASE}/sh-elf/include/
 # For some reason, freetype expects to be special and different.
-NAOMI_SH_INCLUDEPATHS += -I${NAOMI_SH_BASE}/include/freetype2
+NAOMI_SH_INCLUDEPATHS += -I${NAOMI_SH_BASE}/include/freetype2/
 
 # Little-endian SH-4.
 NAOMI_SH_CCFLAGS  = -ml
@@ -108,7 +108,7 @@ ARMCC += -mcpu=arm7
 # These largely have the same justification as their counterparts in the above CC section.
 ARMCC += -ffreestanding -fomit-frame-pointer -nostdlib -nostartfiles -fno-stack-protector
 # Add libnaomi to include path.
-ARMCC += -I${MAKEFILE_DIR}libnaomi/
+ARMCC += -I${MAKEFILE_DIR}libnaomi/aica/
 # Make sure we compile optimized
 ARMCC += -O3
 # Include debugging information for addr2line.

@@ -5,9 +5,9 @@ OPTIMIZATION_LEVEL ?= -O3
 TOPLEVEL_MAKEFILE := $(abspath $(firstword $(MAKEFILE_LIST)))
 
 # Set up common library path definitions.
-NAOMI_SH_INCLUDEPATHS  = -I${NAOMI_SH_BASE}/include -I${NAOMI_SH_BASE}/sh-elf/include
+NAOMI_SH_INCLUDEPATHS  = -I${NAOMI_SH_BASE}/include/ -I${NAOMI_SH_BASE}/sh-elf/include/
 # For some reason, freetype expects to be special and different.
-NAOMI_SH_INCLUDEPATHS += -I${NAOMI_SH_BASE}/include/freetype2
+NAOMI_SH_INCLUDEPATHS += -I${NAOMI_SH_BASE}/include/freetype2/
 
 # Little-endian SH-4.
 NAOMI_SH_CCFLAGS  = -ml
