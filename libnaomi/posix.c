@@ -2014,3 +2014,189 @@ int pthread_getattr_np(pthread_t id, pthread_attr_t *attr)
     irq_restore(old_irq);
     return retval;
 }
+
+int pthread_spin_init (pthread_spinlock_t *spinlock, int pshared)
+{
+    // Use mutexes for spinlocks, but only ever use trylock in a spinloop.
+    mutex_t *spinmutex = malloc(sizeof(mutex_t));
+    if (spinmutex == 0)
+    {
+        return ENOMEM;
+    }
+
+    // Initialize the mutex.
+    mutex_init(spinmutex);
+
+    // Return a pointer aliased to the spinlock type.
+    *spinlock = (pthread_spinlock_t)spinmutex;
+    return 0;
+}
+
+int pthread_spin_destroy (pthread_spinlock_t *spinlock)
+{
+    // Alias back to a pointer.
+    mutex_t *spinmutex = (mutex_t *)(*spinlock);
+
+    // Free the underlying mutex.
+    mutex_free(spinmutex);
+
+    // Free the memory for the mutex.
+    free(spinmutex);
+    return 0;
+}
+
+int pthread_spin_lock (pthread_spinlock_t *spinlock)
+{
+    // Alias back to a pointer.
+    mutex_t *spinmutex = (mutex_t *)(*spinlock);
+
+    // Wait until we get the mutex.
+    while(mutex_try_lock(spinmutex) == 0) { ; }
+
+    // We got it!
+    return 0;
+}
+
+int pthread_spin_trylock (pthread_spinlock_t *spinlock)
+{
+    // Alias back to a pointer.
+    mutex_t *spinmutex = (mutex_t *)(*spinlock);
+
+    if (mutex_try_lock(spinmutex))
+    {
+        // Got the mutex!
+        return 0;
+    }
+    else
+    {
+        // Did not get the mutex!
+        return EBUSY;
+    }
+
+}
+
+int pthread_spin_unlock (pthread_spinlock_t *spinlock)
+{
+    // Alias back to a pointer.
+    mutex_t *spinmutex = (mutex_t *)(*spinlock);
+
+    // Unlock the mutex.
+    mutex_unlock(spinmutex);
+    return 0;
+}
+
+int pthread_mutexattr_init (pthread_mutexattr_t *attr)
+{
+    memset(attr, 0, sizeof(pthread_mutexattr_t));
+    attr->is_initialized = 1;
+    return 0;
+}
+
+int pthread_mutexattr_destroy (pthread_mutexattr_t *attr)
+{
+    attr->is_initialized = 0;
+    return 0;
+}
+
+int pthread_mutexattr_getpshared (const pthread_mutexattr_t *attr, int *pshared)
+{
+    // We don't support pshared attributes, since we don't have processes.
+    return EINVAL;
+}
+
+int pthread_mutexattr_setpshared (pthread_mutexattr_t *attr, int pshared)
+{
+    // We don't support pshared attributes, since we don't have processes.
+    return EINVAL;
+}
+
+int pthread_mutexattr_gettype (const pthread_mutexattr_t *attr, int *kind)
+{
+    // All mutexes in libnaomi are recursive and checked, so return that.
+    if (kind)
+    {
+        *kind = PTHREAD_MUTEX_RECURSIVE;
+    }
+    return 0;
+}
+
+int pthread_mutexattr_settype (pthread_mutexattr_t *attr, int kind)
+{
+    // Ignore this, since all mutexes are recursive and checked.
+    return 0;
+}
+
+int pthread_mutex_init (pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
+{
+    if (attr)
+    {
+        if (attr->is_initialized == 0)
+        {
+            return EINVAL;
+        }
+    }
+
+    mutex_t *lnmutex = malloc(sizeof(mutex_t));
+    if (lnmutex == 0)
+    {
+        return ENOMEM;
+    }
+
+    // Initialize the mutex.
+    mutex_init(lnmutex);
+
+    // Return a pointer aliased to the mutex type.
+    *mutex = (pthread_mutex_t)lnmutex;
+    return 0;
+}
+
+int pthread_mutex_destroy (pthread_mutex_t *mutex)
+{
+    // Alias back to a pointer.
+    mutex_t *lnmutex = (mutex_t *)(*mutex);
+
+    // Free the underlying mutex.
+    mutex_free(lnmutex);
+
+    // Free the memory for the mutex.
+    free(lnmutex);
+    return 0;
+}
+
+int pthread_mutex_lock (pthread_mutex_t *mutex)
+{
+    // Alias back to a pointer.
+    mutex_t *lnmutex = (mutex_t *)(*mutex);
+
+    // Lock the mutex.
+    mutex_lock(lnmutex);
+    return 0;
+}
+
+int pthread_mutex_trylock (pthread_mutex_t *mutex)
+{
+    // Alias back to a pointer.
+    mutex_t *lnmutex = (mutex_t *)(*mutex);
+
+    // Lock the mutex.
+    if (mutex_try_lock(lnmutex))
+    {
+        // Got the mutex!
+        return 0;
+    }
+    else
+    {
+        // Failed to get the mutex.
+        return EBUSY;
+    }
+}
+
+int pthread_mutex_unlock (pthread_mutex_t *mutex)
+{
+    // Alias back to a pointer.
+    mutex_t *lnmutex = (mutex_t *)(*mutex);
+
+    // Lock the mutex.
+    mutex_unlock(lnmutex);
+    return 0;
+}
