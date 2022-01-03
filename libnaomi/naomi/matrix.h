@@ -70,6 +70,12 @@ void matrix_push();
 // the system matrix.
 void matrix_pop();
 
+// Load a previously pushed system matrix from the stack and place it into
+// the system matrix, without popping it off. The index is negative, where
+// -1 is the most previously pushed matrix, -2 is the one before that, and
+// so on and so forth.
+void matrix_peek(int pos);
+
 // Invert the system matrix, such that if Ma = x, (M^-1)x = a.
 void matrix_invert();
 

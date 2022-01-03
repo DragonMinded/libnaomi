@@ -260,6 +260,14 @@ void matrix_pop()
     }
 }
 
+void matrix_peek(int pos)
+{
+    if ((matrixpos + pos) >= 0 && (matrixpos + pos) < MAX_MATRIXES)
+    {
+        matrix_set(&sysmatrix[matrixpos + pos]);
+    }
+}
+
 float _minor(float m[16], int r0, int r1, int r2, int c0, int c1, int c2)
 {
     return (
