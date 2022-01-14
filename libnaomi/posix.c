@@ -1980,14 +1980,15 @@ int pthread_cancel(pthread_t pthread)
     int retval = 0;
     if (thread_info((uint32_t)pthread, NULL))
     {
+        irq_restore(old_irq);
         thread_cancel((uint32_t)pthread);
         _pthread_gc();
     }
     else
     {
+        irq_restore(old_irq);
         retval = ESRCH;
     }
-    irq_restore(old_irq);
     return retval;
 }
 
