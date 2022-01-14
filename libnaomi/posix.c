@@ -1705,8 +1705,13 @@ pthread_detached_t *detach_head = NULL;
 
 void _pthread_gc()
 {
+    /* Grab the detach head. Since we only ever place items onto the
+     * beginning of it, we can safely lock here. We only need to relock
+     * if we need to delete an entry. */
     uint32_t old_irq = irq_disable();
     pthread_detached_t *cur = detach_head;
+    irq_restore(old_irq);
+
     pthread_detached_t *last = 0;
     while (cur)
     {
@@ -1729,7 +1734,28 @@ void _pthread_gc()
             }
             else
             {
-                detach_head = next;
+                // Since we only ever add by changing the head, if something
+                // changed the head that means we need to re-iterate.
+                old_irq = irq_disable();
+                if (detach_head == cur)
+                {
+                    detach_head = next;
+                }
+                else
+                {
+                    pthread_detached_t *todelete = detach_head;
+                    while (todelete)
+                    {
+                        if (todelete->next == cur)
+                        {
+                            todelete->next = next;
+                            break;
+                        }
+
+                        todelete = todelete->next;
+                    }
+                }
+                irq_restore(old_irq);
             }
 
             // Kill the structure that tracks it.
@@ -1743,8 +1769,6 @@ void _pthread_gc()
             cur = cur->next;
         }
     }
-
-    irq_restore(old_irq);
 }
 
 int pthread_create(
@@ -1781,21 +1805,32 @@ int pthread_create(
     uint32_t new_thread = thread_create("pthread", start_routine, arg);
     if (new_thread)
     {
+        int retval = 0;
+
         if (create_detached)
         {
             // Create a new entry for this thread to be auto-cleaned.
             pthread_detached_t *new = malloc(sizeof(pthread_detached_t));
-            new->tid = new_thread;
-            new->next = detach_head;
+            if (new)
+            {
+                uint32_t old_irq = irq_disable();
+                new->tid = new_thread;
+                new->next = detach_head;
 
-            // Slot it into the structure.
-            detach_head = new;
+                // Slot it into the structure.
+                detach_head = new;
+                irq_restore(old_irq);
+            }
+            else
+            {
+                retval = ENOMEM;
+            }
         }
 
         *pthread = (pthread_t)new_thread;
         thread_start(new_thread);
         _pthread_gc();
-        return 0;
+        return retval;
     }
     else
     {
@@ -1824,7 +1859,8 @@ int pthread_join(pthread_t pthread, void **value_ptr)
             cur = cur->next;
         }
 
-        // Join and destroy the thread if it is joinable.
+        // Join and destroy the thread if it is joinable. We need to do this
+        // with threads enabled as join is a syscall.
         irq_restore(old_irq);
         if (retval == 0)
         {
@@ -1870,11 +1906,18 @@ int pthread_detach(pthread_t pthread)
         {
             // Create a new entry for this thread to be auto-cleaned.
             pthread_detached_t *new = malloc(sizeof(pthread_detached_t));
-            new->tid = (uint32_t)pthread;
-            new->next = detach_head;
+            if (new)
+            {
+                new->tid = (uint32_t)pthread;
+                new->next = detach_head;
 
-            // Slot it into the structure.
-            detach_head = new;
+                // Slot it into the structure.
+                detach_head = new;
+            }
+            else
+            {
+                retval = ENOMEM;
+            }
         }
 
         irq_restore(old_irq);
