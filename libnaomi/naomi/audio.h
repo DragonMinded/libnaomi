@@ -39,8 +39,9 @@ uint32_t audio_aica_uptime();
 // should be an integer between 8000-96000, and the speakers should be a bitmask
 // of the above speaker constants. The volume should be a floating point number
 // between 0.0 and 1.0 inclusive for how loud to play the sample (completely silent
-// to full volume). Returns 0 on success, and a negative number to indicate that
-// there were no available channels to play on.
+// to full volume). The number of samples should be less than 65535 as this is the
+// hardware limitation for the length of a sample. Returns 0 on success, and a
+// negative number to indicate that there were no available channels to play on.
 int audio_play_sound(int format, unsigned int samplerate, uint32_t speakers, float volume, void *data, unsigned int num_samples);
 
 // Register a sound to be played later. This will move the soudn to the correct
@@ -49,7 +50,9 @@ int audio_play_sound(int format, unsigned int samplerate, uint32_t speakers, flo
 // efficient than just playing the sound directly. The format should be one of
 // the above audio format defines, the samplerate should be an integer between
 // 8000-96000, and the speakers should be a bitmask of the above speaker constants.
-// Returns a negative number if there was no room to register the sound.
+// The number of samples should be less than 65535 as this is the hardware
+// limitation for the length of a sample. Returns a negative number if there was
+// no room to register the sound.
 int audio_register_sound(int format, unsigned int samplerate, void *data, unsigned int num_samples);
 
 // Unregister a previously registered sound, freeing that spot up for potentially
@@ -86,7 +89,9 @@ int audio_clear_registered_sound_loop(int sound);
 // the format of data you will be writing later. The samplerate is the playback speed
 // of the buffer in hz. The num_samples is how many samples you want available in your
 // ringbuffer. Higher means less chance of underflow but higher latency on audio output.
-// Care should be taken to ensure that num_samples is always divisible by 4.
+// Care should be taken to ensure that num_samples is always divisible by 4. Note that
+// this must still be less than 65535 samples as this is the hardware limitation for
+// any one sample worth of playback.
 int audio_register_ringbuffer(int format, unsigned int samplerate, unsigned int num_samples);
 
 // Frees up a previously registered stereo ringbuffer.
