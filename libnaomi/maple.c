@@ -484,6 +484,9 @@ int maple_request_eeprom_read(uint8_t *outbytes)
 {
     if (mutex_try_lock(&maple_mutex))
     {
+        // The maple bus could be fetching JVS replies from another request.
+        _maple_wait_for_ready();
+
         uint8_t req_subcommand[4] = {
             0x01,         // Subcommand 0x01, read whole EEPROM to MIE.
             0x00,
@@ -555,6 +558,9 @@ int maple_request_eeprom_write(uint8_t *inbytes)
 {
     if (mutex_try_lock(&maple_mutex))
     {
+        // The maple bus could be fetching JVS replies from another request.
+        _maple_wait_for_ready();
+
         for(unsigned int i = 0; i < 0x80; i += 0x10)
         {
             // First, craft the subcommand requesting an EEPROM chunk write.
