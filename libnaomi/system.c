@@ -43,7 +43,7 @@ int __test()
 int test() __attribute__((weak, alias ("__test")));
 
 // Prototype for passing the signal on to GDB if it connects.
-void _gdb_set_haltreason(int reason);
+void _gdb_set_haltreason(int reason, irq_state_t *state);
 
 // Prototype for polling DIMM commands so we can keep the communication
 // channel open even in a halted state. This is so GDB can connect and
@@ -85,7 +85,7 @@ void _halt()
         if (halted == 0)
         {
             // User continued, not valid, so re-raise the exception.
-            _gdb_set_haltreason(SIGTERM);
+            _gdb_set_haltreason(SIGTERM, &exit_state);
         }
     }
 }

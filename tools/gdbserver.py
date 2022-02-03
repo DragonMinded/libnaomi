@@ -62,7 +62,7 @@ def _hex(val: int) -> bytes:
     return hexval.encode('ascii')
 
 
-_escapable_bytes = {ord("}"), ord("#"), ord("$")}
+_escapable_bytes = {ord("}"), ord("#"), ord("$"), ord("*")}
 
 
 def gdb_make_crc(packet: bytes) -> bytes:

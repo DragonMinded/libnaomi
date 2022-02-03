@@ -37,6 +37,10 @@ static int haltreason = SIGTRAP;
 // Whether we're in single-stepping mode or not.
 static int stepped = 0;
 
+// Prototypes from the threading library for working out threads.
+uint32_t _thread_current_id(irq_state_t *cur_state);
+irq_state_t *_thread_get_regs(uint32_t threadid);
+
 // Is there a response available to send to the host?
 int _gdb_has_response()
 {
@@ -148,7 +152,14 @@ void _gdb_send_acknowledge_response()
     response_length = 8;
 }
 
-void _gdb_set_haltreason(int reason)
+void _gdb_send_stop_reply(int haltreason, irq_state_t *state)
+{
+    // Send a halt reason that includes the current thread ID so that GDB does not
+    // get out of sync with our concept of the current thread.
+    _gdb_send_valid_response("T%02Xthread:%lX;", haltreason, _thread_current_id(state));
+}
+
+void _gdb_set_haltreason(int reason, irq_state_t *state)
 {
     // Set the halt reason for future queries.
     haltreason = reason;
@@ -158,7 +169,7 @@ void _gdb_set_haltreason(int reason)
     // it connects to us later.
     if (buffer_offset)
     {
-        _gdb_send_valid_response("S%02X", haltreason);
+        _gdb_send_stop_reply(haltreason, state);
     }
 }
 
@@ -427,10 +438,6 @@ unsigned int _gdb_hex2intdefault(char **buffer, int size, unsigned int def)
     }
 }
 
-// Prototypes from the threading library for working out threads.
-uint32_t _thread_current_id(irq_state_t *cur_state);
-irq_state_t *_thread_get_regs(uint32_t threadid);
-
 int _gdb_handle_command(uint32_t address, irq_state_t *cur_state)
 {
     // First, read the command itself.
@@ -554,6 +561,8 @@ int _gdb_handle_command(uint32_t address, irq_state_t *cur_state)
                 }
 
                 // Wake up and continue processing, no longer halt in GDB. Don't send a packet.
+                threadids[OPERATION_REGISTERS] = 0;
+                threadids[OPERATION_CONTINUE] = 0;
                 _gdb_send_acknowledge_response();
                 return 0;
             }
@@ -622,6 +631,8 @@ int _gdb_handle_command(uint32_t address, irq_state_t *cur_state)
                 }
 
                 // Wake up and continue processing, no longer halt in GDB. Don't send a packet.
+                threadids[OPERATION_REGISTERS] = 0;
+                threadids[OPERATION_CONTINUE] = 0;
                 _gdb_send_acknowledge_response();
                 return 0;
             }
@@ -1512,7 +1523,7 @@ int _gdb_handle_command(uint32_t address, irq_state_t *cur_state)
         case '?':
         {
             // Query why we were stopped.
-            _gdb_send_valid_response("S%02X", haltreason);
+            _gdb_send_stop_reply(haltreason, cur_state);
             return 1;
         }
         case 'k':
@@ -1710,14 +1721,14 @@ int _gdb_breakpoint_halt(irq_state_t *cur_state)
 
     // Inform the host that we halted.
     haltreason = SIGTRAP;
-    _gdb_send_valid_response("S%02X", haltreason);
+    _gdb_send_stop_reply(haltreason, cur_state);
     return 1;
 }
 
 int _gdb_user_halt(irq_state_t *cur_state)
 {
     haltreason = SIGTRAP;
-    _gdb_send_valid_response("S%02X", haltreason);
+    _gdb_send_stop_reply(haltreason, cur_state);
     return 1;
 }
 

@@ -54,7 +54,7 @@ static irq_stats_t stats;
 static int disable_debugging;
 
 // Prototype for passing the signal on to GDB if it connects.
-void _gdb_set_haltreason(int reason);
+void _gdb_set_haltreason(int reason, irq_state_t *state);
 
 // Prototypes for halting the system with a GDB breakpoint.
 int _gdb_user_halt(irq_state_t *cur_state);
@@ -87,7 +87,7 @@ void _irq_display_exception(int signal, irq_state_t *cur_state, char *failure, i
     irq_disable();
 
     // Inform GDB why we halted.
-    _gdb_set_haltreason(signal);
+    _gdb_set_haltreason(signal, cur_state);
 
     // (Re-)init video to a known state to display the exception.
     video_init(VIDEO_COLOR_1555);
@@ -122,7 +122,7 @@ void _irq_display_exception(int signal, irq_state_t *cur_state, char *failure, i
             if (halted == 0)
             {
                 // User continued, not valid, so re-raise the exception.
-                _gdb_set_haltreason(signal);
+                _gdb_set_haltreason(signal, cur_state);
             }
         }
     }
@@ -137,7 +137,7 @@ void _irq_display_invariant(char *msg, char *failure, ...)
     irq_disable();
 
     // Inform GDB why we halted.
-    _gdb_set_haltreason(SIGABRT);
+    _gdb_set_haltreason(SIGABRT, irq_state);
 
     video_init(VIDEO_COLOR_1555);
     console_set_visible(0);
@@ -172,7 +172,7 @@ void _irq_display_invariant(char *msg, char *failure, ...)
             if (halted == 0)
             {
                 // User continued, not valid, so re-raise the exception.
-                _gdb_set_haltreason(SIGABRT);
+                _gdb_set_haltreason(SIGABRT, irq_state);
             }
         }
     }
