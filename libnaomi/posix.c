@@ -25,6 +25,9 @@ void *__dso_handle = NULL;
 /* stdio hook mutex */
 static mutex_t stdio_mutex;
 
+/* pthread_once destructor mutex */
+static mutex_t tls_mutex;
+
 /* Forward definitions for some hook functions. */
 void _fs_init();
 void _fs_free();
@@ -32,6 +35,7 @@ void _fs_free();
 void _posix_init()
 {
     mutex_init(&stdio_mutex);
+    mutex_init(&tls_mutex);
 
     _fs_init();
 }
@@ -2242,5 +2246,120 @@ int pthread_mutex_unlock (pthread_mutex_t *mutex)
 
     // Lock the mutex.
     mutex_unlock(lnmutex);
+    return 0;
+}
+
+int pthread_once (pthread_once_t *__once_control, void (*__init_routine)(void))
+{
+    // First, validate inputs.
+    if (__once_control == NULL || __init_routine == NULL)
+    {
+        return EINVAL;
+    }
+
+    // Now, disable threads to atomically read the control.
+    uint32_t old_irq = irq_disable();
+
+    // First, check if the structure itself is initialized.
+    if (!__once_control->is_initialized)
+    {
+        irq_restore(old_irq);
+        return EINVAL;
+    }
+
+    // Now, check whether we've done this already, and mark that it is done.
+    int executed = __once_control->init_executed;
+    __once_control->init_executed = 1;
+    irq_restore(old_irq);
+
+    // Now, if we haven't run it yet, execute it now!
+    if (!executed)
+    {
+        __init_routine();
+    }
+
+    // Succeeded, so return that we did so, regardless of running thet init.
+    return 0;
+}
+
+#if 0
+typedef struct pthread_tls
+{
+    pthread_key_t key;
+    uint32_t tid;
+    void *data;
+} pthread_tls_t;
+
+// Our list for thread-local storage.
+static int tls_count = 0;
+static pthread_tls_t *tls = 0;
+#endif
+
+// The current global key for pthread keys.
+static uint32_t tls_key = 1;
+
+int pthread_key_create (pthread_key_t *__key, void (*__destructor)(void *))
+{
+    // First, do some quick invariant checks.
+    if (__key == 0)
+    {
+        return EINVAL;
+    }
+
+    if (_irq_is_disabled(_irq_get_sr()))
+    {
+        _irq_display_invariant("pthread failure", "cannot create a tls key with threads disabled!");
+    }
+
+    // First, we need a mutex for our malloc setup.
+    mutex_lock(&tls_mutex);
+
+    // Now, grab a new global key for thread local storage.
+    uint32_t new_key = tls_key++;
+
+    // TODO: Once we support per-thread destructor functions, we need to remember any
+    // optional destructor passed here.
+
+    // Now, set up the key.
+    *__key = (pthread_key_t)new_key;
+
+    // We're done!
+    mutex_unlock(&tls_mutex);
+    return 0;
+}
+
+int pthread_setspecific (pthread_key_t __key, const void *__value)
+{
+    if (_irq_is_disabled(_irq_get_sr()))
+    {
+        _irq_display_invariant("pthread failure", "cannot set data to a tls key with threads disabled!");
+    }
+
+    // TODO: Implement this!
+    _irq_display_invariant("pthreads", "pthread_setspecific called unexpectedly!");
+    return 0;
+}
+
+void *pthread_getspecific (pthread_key_t __key)
+{
+    if (_irq_is_disabled(_irq_get_sr()))
+    {
+        _irq_display_invariant("pthread failure", "cannot get data from a tls key with threads disabled!");
+    }
+
+    // TODO: Implement this!
+    _irq_display_invariant("pthreads", "pthread_getspecific called unexpectedly!");
+    return 0;
+}
+
+int pthread_key_delete (pthread_key_t __key)
+{
+    if (_irq_is_disabled(_irq_get_sr()))
+    {
+        _irq_display_invariant("pthread failure", "cannot delete a tls key with threads disabled!");
+    }
+
+    // TODO: Implement this!
+    _irq_display_invariant("pthreads", "pthread_getspecific called unexpectedly!");
     return 0;
 }
