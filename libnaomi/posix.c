@@ -2065,6 +2065,11 @@ int pthread_getattr_np(pthread_t id, pthread_attr_t *attr)
 
 int pthread_spin_init (pthread_spinlock_t *spinlock, int pshared)
 {
+    if (spinlock == NULL)
+    {
+        return EINVAL;
+    }
+
     // Use mutexes for spinlocks, but only ever use trylock in a spinloop.
     mutex_t *spinmutex = malloc(sizeof(mutex_t));
     if (spinmutex == 0)
@@ -2082,6 +2087,11 @@ int pthread_spin_init (pthread_spinlock_t *spinlock, int pshared)
 
 int pthread_spin_destroy (pthread_spinlock_t *spinlock)
 {
+    if (spinlock == NULL || *spinlock == PTHREAD_SPINLOCK_INITIALIZER)
+    {
+        return EINVAL;
+    }
+
     // Alias back to a pointer.
     mutex_t *spinmutex = (mutex_t *)(*spinlock);
 
@@ -2095,6 +2105,11 @@ int pthread_spin_destroy (pthread_spinlock_t *spinlock)
 
 int pthread_spin_lock (pthread_spinlock_t *spinlock)
 {
+    if (spinlock == NULL || *spinlock == PTHREAD_SPINLOCK_INITIALIZER)
+    {
+        return EINVAL;
+    }
+
     // Alias back to a pointer.
     mutex_t *spinmutex = (mutex_t *)(*spinlock);
 
@@ -2107,6 +2122,11 @@ int pthread_spin_lock (pthread_spinlock_t *spinlock)
 
 int pthread_spin_trylock (pthread_spinlock_t *spinlock)
 {
+    if (spinlock == NULL || *spinlock == PTHREAD_SPINLOCK_INITIALIZER)
+    {
+        return EINVAL;
+    }
+
     // Alias back to a pointer.
     mutex_t *spinmutex = (mutex_t *)(*spinlock);
 
@@ -2125,6 +2145,11 @@ int pthread_spin_trylock (pthread_spinlock_t *spinlock)
 
 int pthread_spin_unlock (pthread_spinlock_t *spinlock)
 {
+    if (spinlock == NULL || *spinlock == PTHREAD_SPINLOCK_INITIALIZER)
+    {
+        return EINVAL;
+    }
+
     // Alias back to a pointer.
     mutex_t *spinmutex = (mutex_t *)(*spinlock);
 
@@ -2176,6 +2201,11 @@ int pthread_mutexattr_settype (pthread_mutexattr_t *attr, int kind)
 
 int pthread_mutex_init (pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 {
+    if (mutex == NULL)
+    {
+        return EINVAL;
+    }
+
     if (attr)
     {
         if (attr->is_initialized == 0)
@@ -2200,6 +2230,11 @@ int pthread_mutex_init (pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 
 int pthread_mutex_destroy (pthread_mutex_t *mutex)
 {
+    if (mutex == NULL || *mutex == PTHREAD_MUTEX_INITIALIZER)
+    {
+        return EINVAL;
+    }
+
     // Alias back to a pointer.
     mutex_t *lnmutex = (mutex_t *)(*mutex);
 
@@ -2213,6 +2248,11 @@ int pthread_mutex_destroy (pthread_mutex_t *mutex)
 
 int pthread_mutex_lock (pthread_mutex_t *mutex)
 {
+    if (mutex == NULL || *mutex == PTHREAD_MUTEX_INITIALIZER)
+    {
+        return EINVAL;
+    }
+
     // Alias back to a pointer.
     mutex_t *lnmutex = (mutex_t *)(*mutex);
 
@@ -2223,6 +2263,11 @@ int pthread_mutex_lock (pthread_mutex_t *mutex)
 
 int pthread_mutex_trylock (pthread_mutex_t *mutex)
 {
+    if (mutex == NULL || *mutex == PTHREAD_MUTEX_INITIALIZER)
+    {
+        return EINVAL;
+    }
+
     // Alias back to a pointer.
     mutex_t *lnmutex = (mutex_t *)(*mutex);
 
@@ -2241,6 +2286,11 @@ int pthread_mutex_trylock (pthread_mutex_t *mutex)
 
 int pthread_mutex_unlock (pthread_mutex_t *mutex)
 {
+    if (mutex == NULL || *mutex == PTHREAD_MUTEX_INITIALIZER)
+    {
+        return EINVAL;
+    }
+
     // Alias back to a pointer.
     mutex_t *lnmutex = (mutex_t *)(*mutex);
 
