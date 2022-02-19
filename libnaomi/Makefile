@@ -7,6 +7,7 @@ all: libnaomi.a
 SRCS += sh-crt0.s
 SRCS += system.c
 SRCS += posix.c
+SRCS += atomic.cpp
 SRCS += interrupt.c
 SRCS += timer.c
 SRCS += thread.c
