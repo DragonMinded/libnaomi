@@ -15,10 +15,12 @@
  *  SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
  */
 
-#ifndef _SYS__PTHREADTYPES_H_
-#define	_SYS__PTHREADTYPES_H_
+#ifndef _SYS__PTHREADTYPES_OVERRIDE_H_
+#define	_SYS__PTHREADTYPES_OVERRIDE_H_
 
-#if defined(_POSIX_THREADS) || __POSIX_VISIBLE >= 199506
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #include <sys/sched.h>
 
@@ -120,9 +122,12 @@ typedef struct {
 } pthread_once_t;       /* dynamic package initialization */
 
 #define _PTHREAD_ONCE_INIT  { 1, 0 }  /* is initialized and not run */
-#endif /* defined(_POSIX_THREADS) || __POSIX_VISIBLE >= 199506 */
 
 /* POSIX Spin Lock Types */
 typedef __uint32_t pthread_spinlock_t;        /* POSIX Spin Lock Object */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* ! _SYS__PTHREADTYPES_H_ */

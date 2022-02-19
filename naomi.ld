@@ -94,6 +94,7 @@ SECTIONS
   /* Thread Local Storage sections  */
   .tdata	  : { *(.tdata .tdata.* .gnu.linkonce.td.*) }
   .tbss		  : { *(.tbss .tbss.* .gnu.linkonce.tb.*) *(.tcommon) }
+  . = ALIGN(32 / 8);
   .preinit_array     :
   {
     PROVIDE_HIDDEN (__preinit_array_start = .);

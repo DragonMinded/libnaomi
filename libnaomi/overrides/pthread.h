@@ -15,8 +15,8 @@
  *  SOFTWARE OR ITS FITNESS FOR ANY PARTICULAR PURPOSE.
  */
 
-#ifndef __PTHREAD_h
-#define __PTHREAD_h
+#ifndef __PTHREAD_OVERRIDE_H
+#define __PTHREAD_OVERRIDE_H
 
 #ifdef __cplusplus
 extern "C" {
