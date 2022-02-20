@@ -2400,7 +2400,14 @@ int pthread_key_create (pthread_key_t *__key, void (*__destructor)(void *))
     uint32_t new_key = tls_key++;
 
     // TODO: Once we support per-thread destructor functions, we need to remember any
-    // optional destructor passed here.
+    // optional destructor passed here. Going to implement it as a thread that wakes up
+    // some amount of times per second, walks the list of keys and runs the destructor
+    // for any key that is associated with a thread that no longer exists, then delete
+    // those keys. Only going to start it if there is a call to pthread_key_create with
+    // a non-zero destructor so that the system doesn't pay the penalty of this thread
+    // otherwise. Will use pthread_once with a destructor check to spawn the thread, and
+    // then the thread will operate similarly to pthread_key_delete but comparing thread
+    // IDs instead of keys.
 
     // Now, set up the key.
     *__key = (pthread_key_t)new_key;
