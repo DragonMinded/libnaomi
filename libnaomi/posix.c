@@ -28,6 +28,9 @@ static mutex_t stdio_mutex;
 /* pthread_once destructor mutex */
 static mutex_t tls_mutex;
 
+/* pthread_mutex static initializer mutex */
+static mutex_t static_mutex;
+
 /* Forward definitions for some hook functions. */
 void _fs_init();
 void _fs_free();
@@ -36,6 +39,7 @@ void _posix_init()
 {
     mutex_init(&stdio_mutex);
     mutex_init(&tls_mutex);
+    mutex_init(&static_mutex);
 
     _fs_init();
 }
@@ -2087,7 +2091,7 @@ int pthread_spin_init (pthread_spinlock_t *spinlock, int pshared)
 
 int pthread_spin_destroy (pthread_spinlock_t *spinlock)
 {
-    if (spinlock == NULL || *spinlock == PTHREAD_SPINLOCK_INITIALIZER)
+    if (spinlock == NULL)
     {
         return EINVAL;
     }
@@ -2105,7 +2109,7 @@ int pthread_spin_destroy (pthread_spinlock_t *spinlock)
 
 int pthread_spin_lock (pthread_spinlock_t *spinlock)
 {
-    if (spinlock == NULL || *spinlock == PTHREAD_SPINLOCK_INITIALIZER)
+    if (spinlock == NULL)
     {
         return EINVAL;
     }
@@ -2122,7 +2126,7 @@ int pthread_spin_lock (pthread_spinlock_t *spinlock)
 
 int pthread_spin_trylock (pthread_spinlock_t *spinlock)
 {
-    if (spinlock == NULL || *spinlock == PTHREAD_SPINLOCK_INITIALIZER)
+    if (spinlock == NULL)
     {
         return EINVAL;
     }
@@ -2145,7 +2149,7 @@ int pthread_spin_trylock (pthread_spinlock_t *spinlock)
 
 int pthread_spin_unlock (pthread_spinlock_t *spinlock)
 {
-    if (spinlock == NULL || *spinlock == PTHREAD_SPINLOCK_INITIALIZER)
+    if (spinlock == NULL)
     {
         return EINVAL;
     }
@@ -2230,9 +2234,13 @@ int pthread_mutex_init (pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
 
 int pthread_mutex_destroy (pthread_mutex_t *mutex)
 {
-    if (mutex == NULL || *mutex == PTHREAD_MUTEX_INITIALIZER)
+    if (mutex == NULL)
     {
         return EINVAL;
+    }
+    if (*mutex == PTHREAD_MUTEX_INITIALIZER)
+    {
+        return 0;
     }
 
     // Alias back to a pointer.
@@ -2248,7 +2256,20 @@ int pthread_mutex_destroy (pthread_mutex_t *mutex)
 
 int pthread_mutex_lock (pthread_mutex_t *mutex)
 {
-    if (mutex == NULL || *mutex == PTHREAD_MUTEX_INITIALIZER)
+    if (mutex == NULL)
+    {
+        return EINVAL;
+    }
+
+    // First, figure out if we need to initialize this mutex.
+    mutex_lock(&static_mutex);
+    if (*mutex == PTHREAD_MUTEX_INITIALIZER)
+    {
+        pthread_mutex_init(mutex, NULL);
+    }
+    mutex_unlock(&static_mutex);
+
+    if (*mutex == PTHREAD_MUTEX_INITIALIZER)
     {
         return EINVAL;
     }
@@ -2263,7 +2284,20 @@ int pthread_mutex_lock (pthread_mutex_t *mutex)
 
 int pthread_mutex_trylock (pthread_mutex_t *mutex)
 {
-    if (mutex == NULL || *mutex == PTHREAD_MUTEX_INITIALIZER)
+    if (mutex == NULL)
+    {
+        return EINVAL;
+    }
+
+    // First, figure out if we need to initialize this mutex.
+    mutex_lock(&static_mutex);
+    if (*mutex == PTHREAD_MUTEX_INITIALIZER)
+    {
+        pthread_mutex_init(mutex, NULL);
+    }
+    mutex_unlock(&static_mutex);
+
+    if (*mutex == PTHREAD_MUTEX_INITIALIZER)
     {
         return EINVAL;
     }

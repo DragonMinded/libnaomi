@@ -274,8 +274,6 @@ void	_pthread_cleanup_pop_restore (struct _pthread_cleanup_context *_context,
  
 int	pthread_getcpuclockid (pthread_t __pthread_id, clockid_t *__clock_id);
 
-#define PTHREAD_SPINLOCK_INITIALIZER ((pthread_spinlock_t) 0xFFFFFFFF)
-
 int	pthread_spin_init (pthread_spinlock_t *__spinlock, int __pshared);
 int	pthread_spin_destroy (pthread_spinlock_t *__spinlock);
 int	pthread_spin_lock (pthread_spinlock_t *__spinlock);
