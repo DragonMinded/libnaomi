@@ -9,6 +9,10 @@
 #include "naomi/timer.h"
 #include "irqstate.h"
 
+// Memory range validation functions, because invalid pointers can cause reboot
+// crashes on real hardware.
+extern int _valid_memory_range(void *addr);
+
 #define SEM_TYPE_MUTEX 1
 #define SEM_TYPE_SEMAPHORE 2
 #define MAX_SEM_AND_MUTEX (MAX_SEMAPHORES + MAX_MUTEXES)
@@ -33,7 +37,7 @@ static int global_mutex_count = 0;
 
 semaphore_internal_t *_semaphore_find(void * semaphore, unsigned int type)
 {
-    if (semaphore != 0)
+    if (_valid_memory_range(semaphore))
     {
         unsigned int id = 0;
         if (type == SEM_TYPE_MUTEX)
@@ -1830,7 +1834,7 @@ void semaphore_init(semaphore_t *semaphore, uint32_t initial_value)
 {
     uint32_t old_interrupts = irq_disable();
 
-    if (semaphore)
+    if (_valid_memory_range(semaphore))
     {
         // Enforce maximum, since we combine semaphores and mutexes.
         if (global_semaphore_count >= MAX_SEMAPHORES)
@@ -1886,7 +1890,7 @@ void semaphore_acquire(semaphore_t * semaphore)
     int irq_disabled = _irq_is_disabled(old_interrupts);
     int acquired = 0;
 
-    if (semaphore)
+    if (_valid_memory_range(semaphore))
     {
         int slot = semaphore->id % MAX_SEM_AND_MUTEX;
         if (semaphores[slot] != 0 && semaphores[slot]->id == semaphore->id && semaphores[slot]->type == SEM_TYPE_SEMAPHORE)
@@ -1929,7 +1933,7 @@ void semaphore_release(semaphore_t * semaphore)
     // amount of time.
     uint32_t old_interrupts = irq_disable();
 
-    if (semaphore)
+    if (_valid_memory_range(semaphore))
     {
         int slot = semaphore->id % MAX_SEM_AND_MUTEX;
         if (
@@ -1958,7 +1962,7 @@ void semaphore_free(semaphore_t *semaphore)
 {
     uint32_t old_interrupts = irq_disable();
 
-    if (semaphore)
+    if (_valid_memory_range(semaphore))
     {
         int slot = semaphore->id % MAX_SEM_AND_MUTEX;
         if (semaphores[slot] != 0 && semaphores[slot]->id == semaphore->id && semaphores[slot]->type == SEM_TYPE_SEMAPHORE)
@@ -1977,7 +1981,7 @@ void mutex_init(mutex_t *mutex)
 {
     uint32_t old_interrupts = irq_disable();
 
-    if (mutex)
+    if (_valid_memory_range(mutex))
     {
         // Enforce maximum, since we combine semaphores and mutexes.
         if (global_mutex_count >= MAX_MUTEXES)
@@ -2031,7 +2035,7 @@ int mutex_try_lock(mutex_t *mutex)
     uint32_t old_interrupts = irq_disable();
     int acquired = 0;
 
-    if (mutex)
+    if (_valid_memory_range(mutex))
     {
         int slot = mutex->id % MAX_SEM_AND_MUTEX;
         if (semaphores[slot] != 0 && semaphores[slot]->id == mutex->id && semaphores[slot]->type == SEM_TYPE_MUTEX)
@@ -2072,7 +2076,7 @@ void mutex_lock(mutex_t * mutex)
     int irq_disabled = _irq_is_disabled(old_interrupts);
     int acquired = 0;
 
-    if (mutex)
+    if (_valid_memory_range(mutex))
     {
         int slot = mutex->id % MAX_SEM_AND_MUTEX;
         if (semaphores[slot] != 0 && semaphores[slot]->id == mutex->id && semaphores[slot]->type == SEM_TYPE_MUTEX)
@@ -2124,7 +2128,7 @@ void mutex_unlock(mutex_t * mutex)
     // amount of time.
     uint32_t old_interrupts = irq_disable();
 
-    if (mutex)
+    if (_valid_memory_range(mutex))
     {
         int slot = mutex->id % MAX_SEM_AND_MUTEX;
         if (
@@ -2168,7 +2172,7 @@ void mutex_free(mutex_t *mutex)
 {
     uint32_t old_interrupts = irq_disable();
 
-    if (mutex)
+    if (_valid_memory_range(mutex))
     {
         int slot = mutex->id % MAX_SEM_AND_MUTEX;
         if (semaphores[slot] != 0 && semaphores[slot]->id == mutex->id && semaphores[slot]->type == SEM_TYPE_MUTEX)

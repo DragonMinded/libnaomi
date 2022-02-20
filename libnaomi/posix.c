@@ -2328,22 +2328,20 @@ int pthread_once (pthread_once_t *__once_control, void (*__init_routine)(void))
         __init_routine();
     }
 
-    // Succeeded, so return that we did so, regardless of running thet init.
+    // Succeeded, so return that we did so, regardless of running the init function.
     return 0;
 }
 
-#if 0
 typedef struct pthread_tls
 {
     pthread_key_t key;
     uint32_t tid;
-    void *data;
+    const void *data;
 } pthread_tls_t;
 
 // Our list for thread-local storage.
 static int tls_count = 0;
 static pthread_tls_t *tls = 0;
-#endif
 
 // The current global key for pthread keys.
 static uint32_t tls_key = 1;
@@ -2385,8 +2383,52 @@ int pthread_setspecific (pthread_key_t __key, const void *__value)
         _irq_display_invariant("pthread failure", "cannot set data to a tls key with threads disabled!");
     }
 
-    // TODO: Implement this!
-    _irq_display_invariant("pthreads", "pthread_setspecific called unexpectedly!");
+    // First, we need a mutex for our malloc setup.
+    mutex_lock(&tls_mutex);
+
+    // Now we need to find if there is any data for this key.
+    uint32_t tid = thread_id();
+    for (int i = 0; i < tls_count; i++)
+    {
+        if (tls[i].key == __key && tls[i].tid == tid)
+        {
+            // Found it! Set the new value.
+            tls[i].data = __value;
+            mutex_unlock(&tls_mutex);
+            return 0;
+        }
+    }
+
+    // We didn't find it, so create a new entry and put the value in.
+    pthread_tls_t *new_tls = 0;
+
+    if (tls_count == 0)
+    {
+        tls_count ++;
+        new_tls = malloc(sizeof(pthread_tls_t) * tls_count);
+    }
+    else
+    {
+        tls_count ++;
+        new_tls = realloc(tls, sizeof(pthread_tls_t) * tls_count);
+    }
+
+    if (new_tls == NULL)
+    {
+        return ENOMEM;
+    }
+    else
+    {
+        tls = new_tls;
+    }
+
+    // Copy the data in.
+    tls[tls_count - 1].key = __key;
+    tls[tls_count - 1].tid = tid;
+    tls[tls_count - 1].data = __value;
+
+    // Success, set the data.
+    mutex_unlock(&tls_mutex);
     return 0;
 }
 
@@ -2397,8 +2439,25 @@ void *pthread_getspecific (pthread_key_t __key)
         _irq_display_invariant("pthread failure", "cannot get data from a tls key with threads disabled!");
     }
 
-    // TODO: Implement this!
-    _irq_display_invariant("pthreads", "pthread_getspecific called unexpectedly!");
+    // First, we need a mutex for our malloc setup.
+    mutex_lock(&tls_mutex);
+
+    // Now we need to find if there is any data for this key.
+    uint32_t tid = thread_id();
+
+    for (int i = 0; i < tls_count; i++)
+    {
+        if (tls[i].key == __key && tls[i].tid == tid)
+        {
+            // Found it! Set the new value.
+            const void *value = tls[i].data;
+            mutex_unlock(&tls_mutex);
+            return (void *)value;
+        }
+    }
+
+    // Couldn't find anything, so no data here.
+    mutex_unlock(&tls_mutex);
     return 0;
 }
 
@@ -2410,6 +2469,6 @@ int pthread_key_delete (pthread_key_t __key)
     }
 
     // TODO: Implement this!
-    _irq_display_invariant("pthreads", "pthread_getspecific called unexpectedly!");
+    _irq_display_invariant("pthreads", "pthread_key_delete called unexpectedly!");
     return 0;
 }

@@ -211,6 +211,12 @@ void _enter()
     _halt();
 }
 
+int _valid_memory_range(void *addr)
+{
+    uint32_t real_addr = (uint32_t)addr & PHYSICAL_MASK;
+    return real_addr >= RAM_BASE && real_addr <= (RAM_BASE + RAM_SIZE);
+}
+
 void _hw_memset(void *addr, uint32_t value, unsigned int amount)
 {
     // Set the base queue address pointer to the queue location with address bits
