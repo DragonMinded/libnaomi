@@ -31,6 +31,9 @@ static mutex_t tls_mutex;
 /* pthread_mutex static initializer mutex */
 static mutex_t static_mutex;
 
+/* One-time destructor thread initializer */
+pthread_once_t destructor_once = PTHREAD_ONCE_INIT;
+
 /* Forward definitions for some hook functions. */
 void _fs_init();
 void _fs_free();
@@ -1699,6 +1702,47 @@ int pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
     return EINVAL;
 }
 
+// Allow our destructor thread to spoof the original thread from the perspective of
+// all pthread functions.
+static uint32_t overridden_thread_id = 0;
+static uint32_t substituted_thread_id = 0;
+
+uint32_t _thread_from_pthread(pthread_t pid)
+{
+    uint32_t old_irq = irq_disable();
+    uint32_t tid = (uint32_t)pid;
+
+    if (overridden_thread_id != 0 && substituted_thread_id != 0 && tid == substituted_thread_id)
+    {
+        tid = overridden_thread_id;
+    }
+
+    irq_restore(old_irq);
+    return (pthread_t)tid;
+}
+
+pthread_t pthread_self(void)
+{
+    uint32_t old_irq = irq_disable();
+
+    // Specifically allow one thread ID to be "changed" to another to support
+    // having a separate thread for destructors that still allows calling
+    // thread-specific functions such as pthread_self() and pthread_key_delete().
+    uint32_t id = thread_id();
+    if (overridden_thread_id != 0 && substituted_thread_id != 0 && id == overridden_thread_id)
+    {
+        id = substituted_thread_id;
+    }
+
+    irq_restore(old_irq);
+    return (pthread_t)id;
+}
+
+int pthread_equal(pthread_t t1, pthread_t t2)
+{
+    return _thread_from_pthread(t1) == _thread_from_pthread(t2);
+}
+
 // Prototypes and data structures for lazy GC to support pthread_detach().
 int _thread_can_join(uint32_t id);
 int _thread_can_destroy(uint32_t id);
@@ -1850,14 +1894,19 @@ int pthread_create(
 int pthread_join(pthread_t pthread, void **value_ptr)
 {
     uint32_t old_irq = irq_disable();
-    if (thread_info((uint32_t)pthread, NULL))
+
+    // We don't want to map substitutions back because we don't want to accidentally
+    // join on the destructor thread. So just do a simple cast.
+    uint32_t actual_tid = (uint32_t)pthread;
+
+    if (thread_info(actual_tid, NULL))
     {
         // Verify that it is joinable.
         int retval = 0;
         pthread_detached_t *cur = detach_head;
         while (cur)
         {
-            if (cur->tid == (uint32_t)pthread)
+            if (cur->tid == actual_tid)
             {
                 // Thread is not joinable, it has been detached!
                 retval = EINVAL;
@@ -1872,8 +1921,8 @@ int pthread_join(pthread_t pthread, void **value_ptr)
         irq_restore(old_irq);
         if (retval == 0)
         {
-            void *ret = thread_join((uint32_t)pthread);
-            thread_destroy((uint32_t)pthread);
+            void *ret = thread_join(actual_tid);
+            thread_destroy(actual_tid);
             if (value_ptr)
             {
                 *value_ptr = (ret == THREAD_CANCELLED ? PTHREAD_CANCELED : ret);
@@ -1894,13 +1943,18 @@ int pthread_join(pthread_t pthread, void **value_ptr)
 int pthread_detach(pthread_t pthread)
 {
     uint32_t old_irq = irq_disable();
-    if (thread_info((uint32_t)pthread, NULL))
+
+    // We don't want to map substitutions back because we don't want to accidentally
+    // join on the destructor thread. So just do a simple cast.
+    uint32_t actual_tid = (uint32_t)pthread;
+
+    if (thread_info(actual_tid, NULL))
     {
         int retval = 0;
         pthread_detached_t *cur = detach_head;
         while (cur)
         {
-            if (cur->tid == (uint32_t)pthread)
+            if (cur->tid == actual_tid)
             {
                 // Thread has already been detached!
                 retval = EINVAL;
@@ -1916,7 +1970,7 @@ int pthread_detach(pthread_t pthread)
             pthread_detached_t *new = malloc(sizeof(pthread_detached_t));
             if (new)
             {
-                new->tid = (uint32_t)pthread;
+                new->tid = actual_tid;
                 new->next = detach_head;
 
                 // Slot it into the structure.
@@ -1940,16 +1994,6 @@ int pthread_detach(pthread_t pthread)
     }
 }
 
-pthread_t pthread_self(void)
-{
-    return (pthread_t)thread_id();
-}
-
-int pthread_equal(pthread_t t1, pthread_t t2)
-{
-    return (uint32_t)t1 == (uint32_t)t2;
-}
-
 void pthread_yield(void)
 {
     _pthread_gc();
@@ -1964,7 +2008,7 @@ void pthread_testcancel(void)
 
 int pthread_setcancelstate(int state, int *oldstate)
 {
-    int old = thread_set_cancellable(thread_id(), state == PTHREAD_CANCEL_ENABLE ? 1 : 0);
+    int old = thread_set_cancellable(pthread_self(), state == PTHREAD_CANCEL_ENABLE ? 1 : 0);
     if (oldstate)
     {
         *oldstate = (old != 0 ? PTHREAD_CANCEL_ENABLE : PTHREAD_CANCEL_DISABLE);
@@ -1974,7 +2018,7 @@ int pthread_setcancelstate(int state, int *oldstate)
 
 int pthread_setcanceltype(int type, int *oldtype)
 {
-    int old = thread_set_cancelasync(thread_id(), type == PTHREAD_CANCEL_ASYNCHRONOUS ? 1 : 0);
+    int old = thread_set_cancelasync(pthread_self(), type == PTHREAD_CANCEL_ASYNCHRONOUS ? 1 : 0);
     if (oldtype)
     {
         *oldtype = (old != 0 ? PTHREAD_CANCEL_ASYNCHRONOUS : PTHREAD_CANCEL_DEFERRED);
@@ -1985,11 +2029,16 @@ int pthread_setcanceltype(int type, int *oldtype)
 int pthread_cancel(pthread_t pthread)
 {
     uint32_t old_irq = irq_disable();
+
+    // We don't want to map substitutions back because we don't want to accidentally
+    // join on the destructor thread. So just do a simple cast.
+    uint32_t actual_tid = (uint32_t)pthread;
+
     int retval = 0;
-    if (thread_info((uint32_t)pthread, NULL))
+    if (thread_info(actual_tid, NULL))
     {
         irq_restore(old_irq);
-        thread_cancel((uint32_t)pthread);
+        thread_cancel(actual_tid);
         _pthread_gc();
     }
     else
@@ -2030,12 +2079,17 @@ int pthread_atfork(void (*prepare)(void), void (*parent)(void), void (*child)(vo
     return EINVAL;
 }
 
-int pthread_getattr_np(pthread_t id, pthread_attr_t *attr)
+int pthread_getattr_np(pthread_t pthread, pthread_attr_t *attr)
 {
     uint32_t old_irq = irq_disable();
+
+    // We don't want to map substitutions back because we don't want to accidentally
+    // join on the destructor thread. So just do a simple cast.
+    uint32_t actual_tid = (uint32_t)pthread;
+
     int retval = 0;
 
-    if (thread_info((uint32_t)id, NULL))
+    if (thread_info(actual_tid, NULL))
     {
         memset(attr, 0, sizeof(pthread_attr_t));
         attr->is_initialized = 1;
@@ -2047,7 +2101,7 @@ int pthread_getattr_np(pthread_t id, pthread_attr_t *attr)
         pthread_detached_t *cur = detach_head;
         while (cur)
         {
-            if (cur->tid == (uint32_t)id)
+            if (cur->tid == actual_tid)
             {
                 // Thread is not joinable, it is detachable instead.
                 attr->detachstate = PTHREAD_CREATE_DETACHED;
@@ -2366,7 +2420,17 @@ int pthread_once (pthread_once_t *__once_control, void (*__init_routine)(void))
     return 0;
 }
 
-typedef struct pthread_tls
+typedef struct
+{
+    pthread_key_t key;
+    void (*destructor)(void *);
+} pthread_tls_destructor_t;
+
+// Our list for registered destructors.
+static int tls_destructor_count = 0;
+static pthread_tls_destructor_t *tls_destructor = 0;
+
+typedef struct
 {
     pthread_key_t key;
     uint32_t tid;
@@ -2376,6 +2440,120 @@ typedef struct pthread_tls
 // Our list for thread-local storage.
 static int tls_count = 0;
 static pthread_tls_t *tls = 0;
+
+void *_pthread_destructor(void *_unused)
+{
+    while (1)
+    {
+        // Potential work we might need to do, if we find a dead thread with a destructor
+        // registered and a non-null value for its thread-local storage.
+        pthread_key_t foundkey;
+        uint32_t foundtid = 0;
+        void (*founddestructor)(void *) = NULL;
+
+        // First, we need an exclusive lock for finding any threads that exist or don't.
+        // That way the memory we are iterating over doesn't change from some other thread
+        // calling TLS functions.
+        mutex_lock(&tls_mutex);
+
+        for (int i = 0; i < tls_count; i++)
+        {
+            // First, is this thread even alive?
+            if (thread_info(tls[i].tid, NULL))
+            {
+                // This thread is still alive, ignore it.
+                continue;
+            }
+
+            // Second, does this key have a destructor?
+            for (int j = 0; j < tls_destructor_count; j++)
+            {
+                if (tls_destructor[j].key == tls[i].key && tls_destructor[j].destructor != NULL)
+                {
+                    // It does! Let's try running the destructor for this.
+                    foundkey = tls[i].key;
+                    foundtid = tls[i].tid;
+                    founddestructor = tls_destructor[j].destructor;
+                    break;
+                }
+            }
+
+            if (foundtid != 0)
+            {
+                // Break out early if we found something to do.
+                break;
+            }
+        }
+
+        // Now, unlock since we either have some work to do (that we know won't be modified
+        // because that thread is dead), or we have nothing to do.
+        mutex_unlock(&tls_mutex);
+
+        // If we have something to do, we need to be really careful to do this according to
+        // spec. We should only be running the destructor if the current value is non-null,
+        // and only after setting the value to null, but passing the old value to the destructor.
+        // We also need to spoof the thread for the TLS functions to work at all (especially in
+        // the destructor itself which is under the impression that it is in the original thread).
+        if (foundtid != 0)
+        {
+            // Override our local thread ID from the perspective of pthreads.
+            uint32_t old_irq = irq_disable();
+            overridden_thread_id = thread_id();
+            substituted_thread_id = foundtid;
+            irq_restore(old_irq);
+
+            // Now its safe to grab the old value. If it is null, just delete it and
+            // move on with our lives.
+            void *oldvalue = pthread_getspecific(foundkey);
+            if (oldvalue != NULL)
+            {
+                // First, set the value to null so that we can detect if the thread
+                // changed it in the destructor.
+                pthread_setspecific(foundkey, NULL);
+
+                // Now, call the destructor with the old value.
+                founddestructor(oldvalue);
+
+                // Now, see if it is still null. If it is not, we will do this again
+                // on the next iteration. If it is, we can delete it and move on.
+                // This can result in an infinite loop if a destructor sets a value
+                // again and again, but the pthreads spec specifically allows for this.
+                if (pthread_getspecific(foundkey) == NULL)
+                {
+                    pthread_key_delete(foundkey);
+                }
+            }
+            else
+            {
+                // No need to run the destructor, just delete the key so we never see
+                // it again.
+                pthread_key_delete(foundkey);
+            }
+
+            // Restore our local thread ID from the perspective of pthreads.
+            old_irq = irq_disable();
+            overridden_thread_id = 0;
+            substituted_thread_id = 0;
+            irq_restore(old_irq);
+        }
+        else
+        {
+            // No work to be done, wait a second and try again.
+            thread_sleep(1000000);
+        }
+    }
+}
+
+void _pthread_destructor_spawn()
+{
+    // Spawn a destructor thread which will look for data that needs deleting from
+    // threads that have exited.
+    uint32_t new_thread = thread_create("pthread destructor", _pthread_destructor, NULL);
+    if (new_thread)
+    {
+        thread_start(new_thread);
+    }
+}
 
 // The current global key for pthread keys.
 static uint32_t tls_key = 1;
@@ -2399,15 +2577,35 @@ int pthread_key_create (pthread_key_t *__key, void (*__destructor)(void *))
     // Now, grab a new global key for thread local storage.
     uint32_t new_key = tls_key++;
 
-    // TODO: Once we support per-thread destructor functions, we need to remember any
-    // optional destructor passed here. Going to implement it as a thread that wakes up
-    // some amount of times per second, walks the list of keys and runs the destructor
-    // for any key that is associated with a thread that no longer exists, then delete
-    // those keys. Only going to start it if there is a call to pthread_key_create with
-    // a non-zero destructor so that the system doesn't pay the penalty of this thread
-    // otherwise. Will use pthread_once with a destructor check to spawn the thread, and
-    // then the thread will operate similarly to pthread_key_delete but comparing thread
-    // IDs instead of keys.
+    if (__destructor != 0)
+    {
+        pthread_once(&destructor_once, _pthread_destructor_spawn);
+        pthread_tls_destructor_t *new_tls_destructor = 0;
+
+        if (tls_destructor_count == 0)
+        {
+            tls_destructor_count ++;
+            new_tls_destructor = malloc(sizeof(pthread_tls_destructor_t) * tls_destructor_count);
+        }
+        else
+        {
+            tls_destructor_count ++;
+            new_tls_destructor = realloc(tls_destructor, sizeof(pthread_tls_destructor_t) * tls_destructor_count);
+        }
+
+        if (new_tls_destructor == NULL)
+        {
+            return ENOMEM;
+        }
+        else
+        {
+            tls_destructor = new_tls_destructor;
+        }
+
+        // Copy the data in.
+        tls_destructor[tls_destructor_count - 1].key = (pthread_key_t)new_key;
+        tls_destructor[tls_destructor_count - 1].destructor = __destructor;
+    }
 
     // Now, set up the key.
     *__key = (pthread_key_t)new_key;
@@ -2428,7 +2626,7 @@ int pthread_setspecific (pthread_key_t __key, const void *__value)
     mutex_lock(&tls_mutex);
 
     // Now we need to find if there is any data for this key.
-    uint32_t tid = thread_id();
+    uint32_t tid = pthread_self();
     for (int i = 0; i < tls_count; i++)
     {
         if (tls[i].key == __key && tls[i].tid == tid)
@@ -2484,7 +2682,7 @@ void *pthread_getspecific (pthread_key_t __key)
     mutex_lock(&tls_mutex);
 
     // Now we need to find if there is any data for this key.
-    uint32_t tid = thread_id();
+    uint32_t tid = pthread_self();
 
     for (int i = 0; i < tls_count; i++)
     {
@@ -2516,7 +2714,7 @@ int pthread_key_delete (pthread_key_t __key)
     // in this thread's localstorage for this key.
     pthread_tls_t *new_tls = 0;
     int new_tls_count = 0;
-    uint32_t tid = thread_id();
+    uint32_t tid = pthread_self();
 
     for (int i = 0; i < tls_count; i++)
     {
