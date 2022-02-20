@@ -2502,7 +2502,48 @@ int pthread_key_delete (pthread_key_t __key)
         _irq_display_invariant("pthread failure", "cannot delete a tls key with threads disabled!");
     }
 
-    // TODO: Implement this!
-    _irq_display_invariant("pthreads", "pthread_key_delete called unexpectedly!");
+    // First, we need a mutex for our malloc setup.
+    mutex_lock(&tls_mutex);
+
+    pthread_tls_t *new_tls = 0;
+    int new_tls_count = 0;
+
+    for (int i = 0; i < tls_count; i++)
+    {
+        if (tls[i].key == __key)
+        {
+            // Don't keep this key around.
+            continue;
+        }
+
+        // Allocate space for this key to be kept around.
+        if (new_tls_count == 0)
+        {
+            new_tls_count ++;
+            new_tls = malloc(sizeof(pthread_tls_t) * new_tls_count);
+        }
+        else
+        {
+            new_tls_count ++;
+            new_tls = realloc(new_tls, sizeof(pthread_tls_t) * new_tls_count);
+            if (new_tls == NULL)
+            {
+                _irq_display_invariant("memory failure", "could not allocate memory when performing tls key garbage collection!");
+            }
+        }
+
+        // Copy the data in.
+        new_tls[new_tls_count - 1].key = tls[i].key;
+        new_tls[new_tls_count - 1].tid = tls[i].tid;
+        new_tls[new_tls_count - 1].data = tls[i].data;
+    }
+
+    // Free the old chunk of data, set the new one as boss.
+    free(tls);
+    tls = new_tls;
+    tls_count = new_tls_count;
+
+    // We finished, lets bail!
+    mutex_unlock(&tls_mutex);
     return 0;
 }
