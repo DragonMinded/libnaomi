@@ -2512,14 +2512,17 @@ int pthread_key_delete (pthread_key_t __key)
     // First, we need a mutex for our malloc setup.
     mutex_lock(&tls_mutex);
 
+    // Now, we need to create a new structure containing everything that wasn't
+    // in this thread's localstorage for this key.
     pthread_tls_t *new_tls = 0;
     int new_tls_count = 0;
+    uint32_t tid = thread_id();
 
     for (int i = 0; i < tls_count; i++)
     {
-        if (tls[i].key == __key)
+        if (tls[i].key == __key && tls[i].tid == tid)
         {
-            // Don't keep this key around.
+            // Don't keep this key around, continue so we don't copy it over.
             continue;
         }
 
