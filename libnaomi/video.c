@@ -464,17 +464,19 @@ void video_fill_screen(color_t color)
     if(global_video_depth == 2)
     {
         uint32_t actualcolor = RGB0555(color.r, color.g, color.b);
-        if (!hw_memset(buffer_base, (actualcolor & 0xFFFF) | ((actualcolor << 16) & 0xFFFF0000), global_video_width * global_video_height * 2))
+        uint32_t multvalue = global_video_15khz ? 1 : 2;
+        if (!hw_memset(buffer_base, (actualcolor & 0xFFFF) | ((actualcolor << 16) & 0xFFFF0000), global_video_width * global_video_height * multvalue))
         {
-            memset(buffer_base, (actualcolor & 0xFFFF) | ((actualcolor << 16) & 0xFFFF0000), global_video_width * global_video_height * 2);
+            memset(buffer_base, (actualcolor & 0xFFFF) | ((actualcolor << 16) & 0xFFFF0000), global_video_width * global_video_height * multvalue);
         }
     }
     else if(global_video_depth == 4)
     {
         uint32_t actualcolor = RGB0888(color.r, color.g, color.b);
-        if (!hw_memset(buffer_base, actualcolor, global_video_width * global_video_height * 4))
+        uint32_t multvalue = global_video_15khz ? 2 : 4;
+        if (!hw_memset(buffer_base, actualcolor, global_video_width * global_video_height * multvalue))
         {
-            memset(buffer_base, actualcolor, global_video_width * global_video_height * 4);
+            memset(buffer_base, actualcolor, global_video_width * global_video_height * multvalue);
         }
     }
 }
@@ -556,21 +558,47 @@ void video_fill_box(int x0, int y0, int x1, int y1, color_t color)
         uint32_t actualcolor = RGB0555(color.r, color.g, color.b);
         if(global_video_vertical)
         {
-            for(int col = low_x; col <= high_x; col++)
+            if (global_video_15khz)
             {
-                for(int row = high_y; row >= low_y; row--)
+                for(int col = low_x; col <= high_x; col++)
                 {
-                    SET_PIXEL_V_2(buffer_base, col, row, actualcolor);
+                    for(int row = high_y; row >= low_y; row--)
+                    {
+                        SET_PIXEL_V_2_15(buffer_base, col, row, actualcolor);
+                    }
+                }
+            }
+            else
+            {
+                for(int col = low_x; col <= high_x; col++)
+                {
+                    for(int row = high_y; row >= low_y; row--)
+                    {
+                        SET_PIXEL_V_2_31(buffer_base, col, row, actualcolor);
+                    }
                 }
             }
         }
         else
         {
-            for(int row = low_y; row <= high_y; row++)
+            if (global_video_15khz)
             {
-                for(int col = low_x; col <= high_x; col++)
+                for(int row = low_y; row <= high_y; row++)
                 {
-                    SET_PIXEL_H_2(buffer_base, col, row, actualcolor);
+                    for(int col = low_x; col <= high_x; col++)
+                    {
+                        SET_PIXEL_H_2_15(buffer_base, col, row, actualcolor);
+                    }
+                }
+            }
+            else
+            {
+                for(int row = low_y; row <= high_y; row++)
+                {
+                    for(int col = low_x; col <= high_x; col++)
+                    {
+                        SET_PIXEL_H_2_31(buffer_base, col, row, actualcolor);
+                    }
                 }
             }
         }
@@ -580,21 +608,47 @@ void video_fill_box(int x0, int y0, int x1, int y1, color_t color)
         uint32_t actualcolor = RGB0888(color.r, color.g, color.b);
         if(global_video_vertical)
         {
-            for(int col = low_x; col <= high_x; col++)
+            if (global_video_15khz)
             {
-                for(int row = high_y; row >= low_y; row--)
+                for(int col = low_x; col <= high_x; col++)
                 {
-                    SET_PIXEL_V_4(buffer_base, col, row, actualcolor);
+                    for(int row = high_y; row >= low_y; row--)
+                    {
+                        SET_PIXEL_V_4_15(buffer_base, col, row, actualcolor);
+                    }
+                }
+            }
+            else
+            {
+                for(int col = low_x; col <= high_x; col++)
+                {
+                    for(int row = high_y; row >= low_y; row--)
+                    {
+                        SET_PIXEL_V_4_31(buffer_base, col, row, actualcolor);
+                    }
                 }
             }
         }
         else
         {
-            for(int row = low_y; row <= high_y; row++)
+            if (global_video_15khz)
             {
-                for(int col = low_x; col <= high_x; col++)
+                for(int row = low_y; row <= high_y; row++)
                 {
-                    SET_PIXEL_H_4(buffer_base, col, row, actualcolor);
+                    for(int col = low_x; col <= high_x; col++)
+                    {
+                        SET_PIXEL_H_4_15(buffer_base, col, row, actualcolor);
+                    }
+                }
+            }
+            else
+            {
+                for(int row = low_y; row <= high_y; row++)
+                {
+                    for(int col = low_x; col <= high_x; col++)
+                    {
+                        SET_PIXEL_H_4_31(buffer_base, col, row, actualcolor);
+                    }
                 }
             }
         }
@@ -610,25 +664,53 @@ void video_draw_pixel(int x, int y, color_t color)
     if (global_video_depth == 2)
     {
         uint32_t actualcolor = RGB0555(color.r, color.g, color.b);
-        if (global_video_vertical)
+        if (global_video_15khz)
         {
-            SET_PIXEL_V_2(buffer_base, x, y, actualcolor);
+            if (global_video_vertical)
+            {
+                SET_PIXEL_V_2_15(buffer_base, x, y, actualcolor);
+            }
+            else
+            {
+                SET_PIXEL_H_2_15(buffer_base, x, y, actualcolor);
+            }
         }
         else
         {
-            SET_PIXEL_H_2(buffer_base, x, y, actualcolor);
+            if (global_video_vertical)
+            {
+                SET_PIXEL_V_2_31(buffer_base, x, y, actualcolor);
+            }
+            else
+            {
+                SET_PIXEL_H_2_31(buffer_base, x, y, actualcolor);
+            }
         }
     }
     else if(global_video_depth == 4)
     {
         uint32_t actualcolor = RGB0888(color.r, color.g, color.b);
-        if (global_video_vertical)
+        if (global_video_15khz)
         {
-            SET_PIXEL_V_4(buffer_base, x, y, actualcolor);
+            if (global_video_vertical)
+            {
+                SET_PIXEL_V_4_15(buffer_base, x, y, actualcolor);
+            }
+            else
+            {
+                SET_PIXEL_H_4_15(buffer_base, x, y, actualcolor);
+            }
         }
         else
         {
-            SET_PIXEL_H_4(buffer_base, x, y, actualcolor);
+            if (global_video_vertical)
+            {
+                SET_PIXEL_V_4_31(buffer_base, x, y, actualcolor);
+            }
+            else
+            {
+                SET_PIXEL_H_4_31(buffer_base, x, y, actualcolor);
+            }
         }
     }
 }
@@ -640,13 +722,27 @@ color_t video_get_pixel(int x, int y)
 
     if (global_video_depth == 2)
     {
-        if (global_video_vertical)
+        if (global_video_15khz)
         {
-            color = GET_PIXEL_V_2(buffer_base, x, y);
+            if (global_video_vertical)
+            {
+                color = GET_PIXEL_V_2_15(buffer_base, x, y);
+            }
+            else
+            {
+                color = GET_PIXEL_H_2_15(buffer_base, x, y);
+            }
         }
         else
         {
-            color = GET_PIXEL_H_2(buffer_base, x, y);
+            if (global_video_vertical)
+            {
+                color = GET_PIXEL_V_2_31(buffer_base, x, y);
+            }
+            else
+            {
+                color = GET_PIXEL_H_2_31(buffer_base, x, y);
+            }
         }
 
         retval.a = 0;
@@ -654,13 +750,27 @@ color_t video_get_pixel(int x, int y)
     }
     else if(global_video_depth == 4)
     {
-        if (global_video_vertical)
+        if (global_video_15khz)
         {
-            color = GET_PIXEL_V_4(buffer_base, x, y);
+            if (global_video_vertical)
+            {
+                color = GET_PIXEL_V_4_15(buffer_base, x, y);
+            }
+            else
+            {
+                color = GET_PIXEL_H_4_15(buffer_base, x, y);
+            }
         }
         else
         {
-            color = GET_PIXEL_H_4(buffer_base, x, y);
+            if (global_video_vertical)
+            {
+                color = GET_PIXEL_V_4_31(buffer_base, x, y);
+            }
+            else
+            {
+                color = GET_PIXEL_H_4_31(buffer_base, x, y);
+            }
         }
 
         retval.a = 0;
@@ -926,6 +1036,46 @@ void video_draw_debug_character(int x, int y, color_t color, char ch)
     }
 }
 
+#define UNROLLED_1BPP_ALPHA_BLEND(orientation, bitdepth, frequency) \
+    uint16_t pixel = pixels[col + (row * width)]; \
+    if (pixel & 0x8000) \
+    { \
+        SET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + col, y + row, pixel); \
+    }
+
+#define UNROLLED_8BPP_ALPHA_BLEND(orientation, bitdepth, frequency) \
+    uint32_t pixel = pixels[col + (row * width)]; \
+    unsigned int alpha = (pixel >> 24) & 0xFF; \
+    \
+    if (alpha) \
+    { \
+        if (alpha >= 255) \
+        { \
+            SET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + col, y + row, pixel); \
+        } \
+        else \
+        { \
+            /* First grab the actual RGB values of the source alpha. */ \
+            unsigned int sr; \
+            unsigned int sg; \
+            unsigned int sb; \
+            EXPLODE0888(pixel, sr, sg, sb); \
+            \
+            /* Now grab the actual RGB values (don't care about alpha) for the dest. */ \
+            unsigned int dr; \
+            unsigned int dg; \
+            unsigned int db; \
+            unsigned int negalpha = (~alpha) & 0xFF; \
+            EXPLODE0888(GET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + col, y + row), dr, dg, db); \
+            \
+            /* Technically it should be divided by 255, but this should be much much faster for an 0.4% accuracy loss. */ \
+            dr = ((sr * alpha) + (dr * negalpha)) >> 8; \
+            dg = ((sg * alpha) + (dg * negalpha)) >> 8; \
+            db = ((sb * alpha) + (db * negalpha)) >> 8; \
+            SET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + col, y + row, RGB0888(dr, dg, db)); \
+        } \
+    } \
+
 void video_draw_sprite(int x, int y, int width, int height, void *data)
 {
     int low_x = 0;
@@ -976,28 +1126,46 @@ void video_draw_sprite(int x, int y, int width, int height, void *data)
 
         if(global_video_vertical)
         {
-            for(int col = low_x; col < high_x; col++)
+            if (global_video_15khz)
             {
-                for(int row = (high_y - 1); row >= low_y; row--)
+                for(int col = low_x; col < high_x; col++)
                 {
-                    uint16_t pixel = pixels[col + (row * width)];
-                    if (pixel & 0x8000)
+                    for(int row = (high_y - 1); row >= low_y; row--)
                     {
-                        SET_PIXEL_V_2(buffer_base, x + col, y + row, pixel);
+                        UNROLLED_1BPP_ALPHA_BLEND(V, 2, 15);
+                    }
+                }
+            }
+            else
+            {
+                for(int col = low_x; col < high_x; col++)
+                {
+                    for(int row = (high_y - 1); row >= low_y; row--)
+                    {
+                        UNROLLED_1BPP_ALPHA_BLEND(V, 2, 31);
                     }
                 }
             }
         }
         else
         {
-            for(int row = low_y; row < high_y; row++)
+            if (global_video_15khz)
             {
-                for(int col = low_x; col < high_x; col++)
+                for(int row = low_y; row < high_y; row++)
                 {
-                    uint16_t pixel = pixels[col + (row * width)];
-                    if (pixel & 0x8000)
+                    for(int col = low_x; col < high_x; col++)
                     {
-                        SET_PIXEL_H_2(buffer_base, x + col, y + row, pixel);
+                        UNROLLED_1BPP_ALPHA_BLEND(H, 2, 15);
+                    }
+                }
+            }
+            else
+            {
+                for(int row = low_y; row < high_y; row++)
+                {
+                    for(int col = low_x; col < high_x; col++)
+                    {
+                        UNROLLED_1BPP_ALPHA_BLEND(H, 2, 31);
                     }
                 }
             }
@@ -1009,82 +1177,46 @@ void video_draw_sprite(int x, int y, int width, int height, void *data)
 
         if(global_video_vertical)
         {
-            for(int col = low_x; col < high_x; col++)
+            if (global_video_15khz)
             {
-                for(int row = (high_y - 1); row >= low_y; row--)
+                for(int col = low_x; col < high_x; col++)
                 {
-                    uint32_t pixel = pixels[col + (row * width)];
-                    unsigned int alpha = (pixel >> 24) & 0xFF;
-
-                    if (alpha)
+                    for(int row = (high_y - 1); row >= low_y; row--)
                     {
-                        if (alpha >= 255)
-                        {
-                            SET_PIXEL_V_4(buffer_base, x + col, y + row, pixel);
-                        }
-                        else
-                        {
-                            // First grab the actual RGB values of the source alpha.
-                            unsigned int sr;
-                            unsigned int sg;
-                            unsigned int sb;
-                            EXPLODE0888(pixel, sr, sg, sb);
-
-                            // Now grab the actual RGB values (don't care about alpha) for the dest.
-                            unsigned int dr;
-                            unsigned int dg;
-                            unsigned int db;
-                            unsigned int negalpha = (~alpha) & 0xFF;
-                            EXPLODE0888(GET_PIXEL_V_4(buffer_base, x + col, y + row), dr, dg, db);
-
-                            // Technically it should be divided by 255, but this should
-                            // be much much faster for an 0.4% accuracy loss.
-                            dr = ((sr * alpha) + (dr * negalpha)) >> 8;
-                            dg = ((sg * alpha) + (dg * negalpha)) >> 8;
-                            db = ((sb * alpha) + (db * negalpha)) >> 8;
-                            SET_PIXEL_V_4(buffer_base, x + col, y + row, RGB0888(dr, dg, db));
-                        }
+                        UNROLLED_8BPP_ALPHA_BLEND(V, 4, 15);
+                    }
+                }
+            }
+            else
+            {
+                for(int col = low_x; col < high_x; col++)
+                {
+                    for(int row = (high_y - 1); row >= low_y; row--)
+                    {
+                        UNROLLED_8BPP_ALPHA_BLEND(V, 4, 31);
                     }
                 }
             }
         }
         else
         {
-            for(int row = low_y; row < high_y; row++)
+            if (global_video_15khz)
             {
-                for(int col = low_x; col < high_x; col++)
+                for(int row = low_y; row < high_y; row++)
                 {
-                    uint32_t pixel = pixels[col + (row * width)];
-                    unsigned int alpha = (pixel >> 24) & 0xFF;
-
-                    if (alpha)
+                    for(int col = low_x; col < high_x; col++)
                     {
-                        if (alpha >= 255)
-                        {
-                            SET_PIXEL_H_4(buffer_base, x + col, y + row, pixel);
-                        }
-                        else
-                        {
-                            // First grab the actual RGB values of the source alpha.
-                            unsigned int sr;
-                            unsigned int sg;
-                            unsigned int sb;
-                            EXPLODE0888(pixel, sr, sg, sb);
-
-                            // Now grab the actual RGB values (don't care about alpha) for the dest.
-                            unsigned int dr;
-                            unsigned int dg;
-                            unsigned int db;
-                            unsigned int negalpha = (~alpha) & 0xFF;
-                            EXPLODE0888(GET_PIXEL_H_4(buffer_base, x + col, y + row), dr, dg, db);
-
-                            // Technically it should be divided by 255, but this should
-                            // be much much faster for an 0.4% accuracy loss.
-                            dr = ((sr * alpha) + (dr * negalpha)) >> 8;
-                            dg = ((sg * alpha) + (dg * negalpha)) >> 8;
-                            db = ((sb * alpha) + (db * negalpha)) >> 8;
-                            SET_PIXEL_H_4(buffer_base, x + col, y + row, RGB0888(dr, dg, db));
-                        }
+                        UNROLLED_8BPP_ALPHA_BLEND(H, 4, 15);
+                    }
+                }
+            }
+            else
+            {
+                for(int row = low_y; row < high_y; row++)
+                {
+                    for(int col = low_x; col < high_x; col++)
+                    {
+                        UNROLLED_8BPP_ALPHA_BLEND(H, 4, 31);
                     }
                 }
             }

@@ -2,15 +2,32 @@
 #define __VIDEO_INTERNAL_H
 
 // Internal video defines shared between all video modules. Do not import or use this file.
-#define SET_PIXEL_V_2(base, x, y, color) ((uint16_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)] = (color) & 0xFFFF
-#define SET_PIXEL_H_2(base, x, y, color) ((uint16_t *)(base))[(x) + ((y) * global_video_width)] = (color) & 0xFFFF
-#define SET_PIXEL_V_4(base, x, y, color) ((uint32_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)] = (color)
-#define SET_PIXEL_H_4(base, x, y, color) ((uint32_t *)(base))[(x) + ((y) * global_video_width)] = (color)
+//
+#define SET_PIXEL_V_2_31(base, x, y, color) ((uint16_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)] = (color) & 0xFFFF
+#define SET_PIXEL_H_2_31(base, x, y, color) ((uint16_t *)(base))[(x) + ((y) * global_video_width)] = (color) & 0xFFFF
+#define SET_PIXEL_V_4_31(base, x, y, color) ((uint32_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)] = (color)
+#define SET_PIXEL_H_4_31(base, x, y, color) ((uint32_t *)(base))[(x) + ((y) * global_video_width)] = (color)
 
-#define GET_PIXEL_V_2(base, x, y) ((uint16_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)]
-#define GET_PIXEL_H_2(base, x, y) ((uint16_t *)(base))[(x) + ((y) * global_video_width)]
-#define GET_PIXEL_V_4(base, x, y) ((uint32_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)]
-#define GET_PIXEL_H_4(base, x, y) ((uint32_t *)(base))[(x) + ((y) * global_video_width)]
+#define GET_PIXEL_V_2_31(base, x, y) ((uint16_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)]
+#define GET_PIXEL_H_2_31(base, x, y) ((uint16_t *)(base))[(x) + ((y) * global_video_width)]
+#define GET_PIXEL_V_4_31(base, x, y) ((uint32_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)]
+#define GET_PIXEL_H_4_31(base, x, y) ((uint32_t *)(base))[(x) + ((y) * global_video_width)]
+
+// These differ from the above formulas in that we have to do manual 0.5x vertical scaling. We choose
+// to do this by writing the even lines in the first half of the buffer, and odd lines in the second
+// half. The second half is never read by the display hardware, but it preserves the pixel values on
+// alpha blending and pixel readback.
+#define CALC_HALF_Y(y) (((y) >> 1) + (((y) & 1) ? ((global_video_height) >> 1) : 0))
+
+#define SET_PIXEL_V_2_15(base, x, y, color) ((uint16_t *)(base))[(global_video_width - (y)) + (CALC_HALF_Y(x) * global_video_width)] = (color) & 0xFFFF
+#define SET_PIXEL_H_2_15(base, x, y, color) ((uint16_t *)(base))[(x) + (CALC_HALF_Y(y) * global_video_width)] = (color) & 0xFFFF
+#define SET_PIXEL_V_4_15(base, x, y, color) ((uint32_t *)(base))[(global_video_width - (y)) + (CALC_HALF_Y(x) * global_video_width)] = (color)
+#define SET_PIXEL_H_4_15(base, x, y, color) ((uint32_t *)(base))[(x) + (CALC_HALF_Y(y) * global_video_width)] = (color)
+
+#define GET_PIXEL_V_2_15(base, x, y) ((uint16_t *)(base))[(global_video_width - (y)) + (CALC_HALF_Y(x) * global_video_width)]
+#define GET_PIXEL_H_2_15(base, x, y) ((uint16_t *)(base))[(x) + (CALC_HALF_Y(y) * global_video_width)]
+#define GET_PIXEL_V_4_15(base, x, y) ((uint32_t *)(base))[(global_video_width - (y)) + (CALC_HALF_Y(x) * global_video_width)]
+#define GET_PIXEL_H_4_15(base, x, y) ((uint32_t *)(base))[(x) + (CALC_HALF_Y(y) * global_video_width)]
 
 #define RGB0555(r, g, b) ((((b) >> 3) & (0x1F << 0)) | (((g) << 2) & (0x1F << 5)) | (((r) << 7) & (0x1F << 10)) | 0x8000)
 #define RGB1555(r, g, b, a) ((((b) >> 3) & (0x1F << 0)) | (((g) << 2) & (0x1F << 5)) | (((r) << 7) & (0x1F << 10)) | (((a) << 8) & 0x8000))
