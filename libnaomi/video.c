@@ -7,6 +7,7 @@
 #include "naomi/system.h"
 #include "naomi/dimmcomms.h"
 #include "naomi/eeprom.h"
+#include "naomi/maple.h"
 #include "naomi/console.h"
 #include "naomi/interrupt.h"
 #include "naomi/thread.h"
@@ -46,6 +47,7 @@ unsigned int cached_actual_width = 0;
 unsigned int cached_actual_height = 0;
 unsigned int global_video_depth = 0;
 unsigned int global_video_vertical = 0;
+unsigned int global_video_15khz = 0;
 void *buffer_base = 0;
 
 // Our current framebuffer location, for double buffering. The current_buffer_loc
@@ -219,8 +221,22 @@ void _video_set_ta_registers()
     // Set up horizontal clipping to clip within 0-640.
     videobase[POWERVR2_FB_CLIP_X] = ((global_video_width - 1) << 16) | (0 << 0);
 
-    // Set up vertical clipping to within 0-480.
-    videobase[POWERVR2_FB_CLIP_Y] = ((global_video_height - 1) << 16) | (0 << 0);
+    if (global_video_15khz)
+    {
+        // Set up scaling factor of 0.5x for vertical dimension.
+        videobase[POWERVR2_SCALER] = 0x800;
+
+        // Set up vertical clipping to within 0-240 for 15khz.
+        videobase[POWERVR2_FB_CLIP_Y] = (((global_video_height / 2) - 1) << 16) | (0 << 0);
+    }
+    else
+    {
+        // Set up scaling factor of 1.0x for vertical dimension.
+        videobase[POWERVR2_SCALER] = 0x400;
+
+        // Set up vertical clipping to within 0-480 for 31khz.
+        videobase[POWERVR2_FB_CLIP_Y] = ((global_video_height - 1) << 16) | (0 << 0);
+    }
 }
 
 void video_init(int colordepth)
@@ -247,6 +263,11 @@ void video_init(int colordepth)
     eeprom_t eeprom;
     eeprom_read(&eeprom);
     global_video_vertical = eeprom.system.monitor_orientation == MONITOR_ORIENTATION_VERTICAL ? 1 : 0;
+
+    // Now, read controls and figure out if we should be 15khz or 31khz.
+    jvs_buttons_t buttons;
+    maple_request_jvs_buttons(0x01, &buttons);
+    global_video_15khz = buttons.dip1 ? 1 : 0;
 
     if (global_video_vertical) {
         cached_actual_width = global_video_height;
@@ -284,22 +305,27 @@ void video_init(int colordepth)
     videobase[POWERVR2_VIDEO_CFG] = 0x00160000;
 
     // Set up display configuration.
+    uint32_t fb_display_cfg = 0x1 << 0;  // Enable display.
+
     if (global_video_depth == 2)
     {
-        videobase[POWERVR2_FB_DISPLAY_CFG] = (
-            0x1 << 23 |                 // Double pixel clock for VGA.
-            DISPLAY_CFG_RGB1555 << 2 |  // RGB1555 mode.
-            0x1 << 0                    // Enable display.
-        );
+        fb_display_cfg |= DISPLAY_CFG_RGB1555 << 2;  // RGB1555 mode.
     }
     else if (global_video_depth == 4)
     {
-        videobase[POWERVR2_FB_DISPLAY_CFG] = (
-            0x1 << 23 |                 // Double pixel clock for VGA.
-            DISPLAY_CFG_RGB0888 << 2 |  // RGB0888 mode.
-            0x1 << 0                    // Enable display.
-        );
+        fb_display_cfg |= DISPLAY_CFG_RGB0888 << 2;  // RGB0888 mode.
     }
+
+    if (global_video_15khz)
+    {
+        fb_display_cfg |= 0x0 << 23;  // Don't double the pixel clock for 15khz.
+    }
+    else
+    {
+        fb_display_cfg |= 0x1 << 23;  // Double pixel clock for 31khz.
+    }
+
+    videobase[POWERVR2_FB_DISPLAY_CFG] = fb_display_cfg;
 
     // Set up registers that appear to be reset with TA resets.
     _video_set_ta_registers();
@@ -326,35 +352,69 @@ void video_init(int colordepth)
         saved_hvint = videobase[POWERVR2_VBLANK_INTERRUPT];
         initialized = 1;
     }
-    videobase[POWERVR2_VBLANK_INTERRUPT] = (
-        40 << 16 |                       // Out of vblank.
-        (global_video_height + 40) << 0  // In vblank.
-    );
+
+    if (global_video_15khz)
+    {
+        videobase[POWERVR2_VBLANK_INTERRUPT] = (
+            40 << 16 |                             // Out of vblank.
+            ((global_video_height + 40) / 2) << 0  // In vblank.
+        );
+    }
+    else
+    {
+        videobase[POWERVR2_VBLANK_INTERRUPT] = (
+            40 << 16 |                       // Out of vblank.
+            (global_video_height + 40) << 0  // In vblank.
+        );
+    }
 
     // Set up horizontal position.
     videobase[POWERVR2_HPOS] = 166;
 
-    // Set up refresh rate.
+    // Set up refresh rate. It looks like the official bios uses 529/851 for 31khz
+    // and 536/851 for 15khz mode. Not sure why it matters aside from interrupt generation.
     videobase[POWERVR2_SYNC_LOAD] = (
         524 << 16  |  // Vsync
         857 << 0      // Hsync
     );
 
-    // Set up display size.
-    videobase[POWERVR2_FB_DISPLAY_SIZE] = (
-        1 << 20 |                                                   // Interlace skip modulo if we are interlaced ((width / 4) * bpp) + 1
-        (global_video_height - 1) << 10 |                           // height - 1
-        (((global_video_width / 4) * global_video_depth) - 1) << 0  // ((width / 4) * bpp) - 1
-    );
+    if (global_video_15khz)
+    {
+        // Set up display size.
+        videobase[POWERVR2_FB_DISPLAY_SIZE] = (
+            1 << 20 |                                                   // Interlace skip modulo if we are interlaced ((width / 4) * bpp) + 1
+            ((global_video_height - 1) / 2) << 10 |                     // (height - 1) / 2
+            (((global_video_width / 4) * global_video_depth) - 1) << 0  // ((width / 4) * bpp) - 1
+        );
 
-    // Enable display
-    videobase[POWERVR2_SYNC_CFG] = (
-        1 << 8 |  // Enable video
-        0 << 6 |  // VGA mode
-        0 << 4 |  // Non-interlace
-        0 << 2 |  // Negative H-sync
-        0 << 1    // Negative V-sync
-    );
+        // Enable display
+        videobase[POWERVR2_SYNC_CFG] = (
+            1 << 8 |  // Enable video
+            1 << 6 |  // 15khz mode
+            1 << 4 |  // Interlace
+            0 << 2 |  // Negative H-sync
+            0 << 1    // Negative V-sync
+        );
+    }
+    else
+    {
+        // Set up display size.
+        videobase[POWERVR2_FB_DISPLAY_SIZE] = (
+            1 << 20 |                                                   // Interlace skip modulo if we are interlaced ((width / 4) * bpp) + 1
+            (global_video_height - 1) << 10 |                           // height - 1
+            (((global_video_width / 4) * global_video_depth) - 1) << 0  // ((width / 4) * bpp) - 1
+        );
+
+
+        // Enable display
+        videobase[POWERVR2_SYNC_CFG] = (
+            1 << 8 |  // Enable video
+            0 << 6 |  // 31khz mode
+            0 << 4 |  // Non-interlace
+            0 << 2 |  // Negative H-sync
+            0 << 1    // Negative V-sync
+        );
+    }
 
     // Wait for vblank like games do.
     uint32_t vblank_in_position = videobase[POWERVR2_VBLANK_INTERRUPT] & 0x1FF;

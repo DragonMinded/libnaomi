@@ -103,6 +103,7 @@ void _ta_init_buffers();
 #define POWERVR2_VIDEO_CFG (0x0E8 >> 2)
 #define POWERVR2_HPOS (0x0EC >> 2)
 #define POWERVR2_VPOS (0x0F0 >> 2)
+#define POWERVR2_SCALER (0x0F4 >> 2)
 #define POWERVR2_PALETTE_MODE (0x108 >> 2)
 #define POWERVR2_SYNC_STAT (0x10C >> 2)
 #define POWERVR2_OBJBUF_BASE (0x124 >> 2)
