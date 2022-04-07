@@ -157,6 +157,11 @@ unsigned int video_is_vertical()
     return global_video_vertical;
 }
 
+unsigned int video_is_interlaced()
+{
+    return global_video_15khz;
+}
+
 void _vblank_init()
 {
     uint32_t old_interrupts = irq_disable();

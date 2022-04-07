@@ -72,8 +72,18 @@ void *video_scratch_area();
 // Returns nonzero if the screen is in vertical orientation, or zero if
 // the screen is in horizontal orientation. This is for convenience, the
 // pixel-based drawing functions always treat the top left of the screen
-// as (0, 0) from the cabinet player's position.
+// as (0, 0) from the cabinet player's position. Note that the orientation
+// of the cabinet is controlled in the test menu system settings submenu.
 unsigned int video_is_vertical();
+
+// Returns nonzero if the screen is in interlaced mode, or zero if the
+// screen is in progressive mode. This is for convenience, the pixel-based
+// drawing functions always allow you to draw to the entire framebuffer.
+// Note that the cabinet will be in interlaced mode if the user has selected
+// 15khz on the DIP switches (DIP switch 1 is on), and will be in progressive
+// mode if the user has selected 31khz on the DIP switches (DIP switch 1 is
+// off).
+unsigned int video_is_interlaced();
 
 // Fill the entire framebuffer with one color. Note that this is about
 // 3x faster than doing it yourself as it uses hardware features to do so.
