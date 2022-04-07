@@ -223,11 +223,11 @@ void _video_set_ta_registers()
 
     if (global_video_15khz)
     {
-        // Set up scaling factor of 0.5x for vertical dimension.
-        videobase[POWERVR2_SCALER] = 0x800;
+        // Set up scaling factor of ~1.0x for vertical dimension.
+        videobase[POWERVR2_SCALER] = 0x401;
 
         // Set up vertical clipping to within 0-240 for 15khz.
-        videobase[POWERVR2_FB_CLIP_Y] = (((global_video_height / 2) - 1) << 16) | (0 << 0);
+        videobase[POWERVR2_FB_CLIP_Y] = ((global_video_height - 1) << 16) | (0 << 0);
     }
     else
     {
@@ -382,9 +382,9 @@ void video_init(int colordepth)
     {
         // Set up display size.
         videobase[POWERVR2_FB_DISPLAY_SIZE] = (
-            1 << 20 |                                                   // Interlace skip modulo if we are interlaced ((width / 4) * bpp) + 1
-            ((global_video_height - 1) / 2) << 10 |                     // (height - 1) / 2
-            (((global_video_width / 4) * global_video_depth) - 1) << 0  // ((width / 4) * bpp) - 1
+            (((global_video_width / 4) * global_video_depth) + 1) << 20 | // Interlace skip modulo if we are interlaced ((width / 4) * bpp) + 1
+            ((global_video_height - 1) / 2) << 10 |                       // (height - 1) / 2
+            (((global_video_width / 4) * global_video_depth) - 1) << 0    // ((width / 4) * bpp) - 1
         );
 
         // Enable display
