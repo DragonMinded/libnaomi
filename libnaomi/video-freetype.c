@@ -59,21 +59,19 @@ extern unsigned int cached_actual_height;
 extern unsigned int global_video_depth;
 extern unsigned int global_video_vertical;
 extern unsigned int global_video_width;
-extern unsigned int global_video_height;
-extern unsigned int global_video_15khz;
 extern void * buffer_base;
 
 // Alpha-blend the grayscale image with the destination. We only support 32 alpha levels here for speed.
 // Technically the destination r/g/b values should be divided by 255, but shifting right by 8 (divide by
 // 256) should be much much faster for an 0.4% accuracy loss.
-#define UNROLLED_ALPHA_BLEND(orientation, bitdepth, frequency, colormode) \
+#define UNROLLED_ALPHA_BLEND(orientation, bitdepth, colormode) \
     unsigned int alpha = buffer[(yp * width) + xp] | 0x7; \
     \
     if (alpha > 0x7) \
     { \
         if(alpha >= 255) \
         { \
-            SET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + xp, y + yp, actual_color); \
+            SET_PIXEL_ ## orientation ## _ ## bitdepth(buffer_base, x + xp, y + yp, actual_color); \
         } \
         else \
         { \
@@ -82,11 +80,11 @@ extern void * buffer_base;
             unsigned int db; \
             unsigned int negalpha = (~alpha) & 0xFF; \
             \
-            EXPLODE ## colormode(GET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + xp, y + yp), dr, dg, db); \
+            EXPLODE ## colormode(GET_PIXEL_ ## orientation ## _ ## bitdepth(buffer_base, x + xp, y + yp), dr, dg, db); \
             dr = ((sr * alpha) + (dr * negalpha)) >> 8; \
             dg = ((sg * alpha) + (dg * negalpha)) >> 8; \
             db = ((sb * alpha) + (db * negalpha)) >> 8; \
-            SET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + xp, y + yp, RGB ## colormode(dr, dg, db)); \
+            SET_PIXEL_ ## orientation ## _ ## bitdepth(buffer_base, x + xp, y + yp, RGB ## colormode(dr, dg, db)); \
         } \
     } \
 
@@ -150,47 +148,21 @@ void __video_draw_cached_bitmap(int x, int y, unsigned int width, unsigned int h
             /* Iterate slightly differently so we can guarantee that we're close to the data
              * cache, since drawing vertically is done from the perspective of a horizontal
              * buffer. */
-            if (global_video_15khz)
+            for(int xp = low_x; xp < high_x; xp++)
             {
-                for(int xp = low_x; xp < high_x; xp++)
+                for (int yp = (high_y - 1); yp >= low_y; yp--)
                 {
-                    for (int yp = (high_y - 1); yp >= low_y; yp--)
-                    {
-                        UNROLLED_ALPHA_BLEND(V, 2, 15, 0555);
-                    }
-                }
-            }
-            else
-            {
-                for(int xp = low_x; xp < high_x; xp++)
-                {
-                    for (int yp = (high_y - 1); yp >= low_y; yp--)
-                    {
-                        UNROLLED_ALPHA_BLEND(V, 2, 31, 0555);
-                    }
+                    UNROLLED_ALPHA_BLEND(V, 2, 0555);
                 }
             }
         }
         else
         {
-            if (global_video_15khz)
+            for (int yp = low_y; yp < high_y; yp++)
             {
-                for (int yp = low_y; yp < high_y; yp++)
+                for(int xp = low_x; xp < high_x; xp++)
                 {
-                    for(int xp = low_x; xp < high_x; xp++)
-                    {
-                        UNROLLED_ALPHA_BLEND(H, 2, 15, 0555);
-                    }
-                }
-            }
-            else
-            {
-                for (int yp = low_y; yp < high_y; yp++)
-                {
-                    for(int xp = low_x; xp < high_x; xp++)
-                    {
-                        UNROLLED_ALPHA_BLEND(H, 2, 31, 0555);
-                    }
+                    UNROLLED_ALPHA_BLEND(H, 2, 0555);
                 }
             }
         }
@@ -208,47 +180,21 @@ void __video_draw_cached_bitmap(int x, int y, unsigned int width, unsigned int h
             /* Iterate slightly differently so we can guarantee that we're close to the data
              * cache, since drawing vertically is done from the perspective of a horizontal
              * buffer. */
-            if (global_video_15khz)
+            for(int xp = low_x; xp < high_x; xp++)
             {
-                for(int xp = low_x; xp < high_x; xp++)
+                for (int yp = (high_y - 1); yp >= low_y; yp--)
                 {
-                    for (int yp = (high_y - 1); yp >= low_y; yp--)
-                    {
-                        UNROLLED_ALPHA_BLEND(V, 4, 15, 0888);
-                    }
-                }
-            }
-            else
-            {
-                for(int xp = low_x; xp < high_x; xp++)
-                {
-                    for (int yp = (high_y - 1); yp >= low_y; yp--)
-                    {
-                        UNROLLED_ALPHA_BLEND(V, 4, 31, 0888);
-                    }
+                    UNROLLED_ALPHA_BLEND(V, 4, 0888);
                 }
             }
         }
         else
         {
-            if (global_video_15khz)
+            for (int yp = low_y; yp < high_y; yp++)
             {
-                for (int yp = low_y; yp < high_y; yp++)
+                for(int xp = low_x; xp < high_x; xp++)
                 {
-                    for(int xp = low_x; xp < high_x; xp++)
-                    {
-                        UNROLLED_ALPHA_BLEND(H, 4, 15, 0888);
-                    }
-                }
-            }
-            else
-            {
-                for (int yp = low_y; yp < high_y; yp++)
-                {
-                    for(int xp = low_x; xp < high_x; xp++)
-                    {
-                        UNROLLED_ALPHA_BLEND(H, 4, 31, 0888);
-                    }
+                    UNROLLED_ALPHA_BLEND(H, 4, 0888);
                 }
             }
         }

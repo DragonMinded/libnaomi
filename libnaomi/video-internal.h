@@ -2,26 +2,16 @@
 #define __VIDEO_INTERNAL_H
 
 // Internal video defines shared between all video modules. Do not import or use this file.
-//
-#define SET_PIXEL_V_2_31(base, x, y, color) ((uint16_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)] = (color) & 0xFFFF
-#define SET_PIXEL_H_2_31(base, x, y, color) ((uint16_t *)(base))[(x) + ((y) * global_video_width)] = (color) & 0xFFFF
-#define SET_PIXEL_V_4_31(base, x, y, color) ((uint32_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)] = (color)
-#define SET_PIXEL_H_4_31(base, x, y, color) ((uint32_t *)(base))[(x) + ((y) * global_video_width)] = (color)
 
-#define GET_PIXEL_V_2_31(base, x, y) ((uint16_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)]
-#define GET_PIXEL_H_2_31(base, x, y) ((uint16_t *)(base))[(x) + ((y) * global_video_width)]
-#define GET_PIXEL_V_4_31(base, x, y) ((uint32_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)]
-#define GET_PIXEL_H_4_31(base, x, y) ((uint32_t *)(base))[(x) + ((y) * global_video_width)]
+#define SET_PIXEL_V_2(base, x, y, color) ((uint16_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)] = (color) & 0xFFFF
+#define SET_PIXEL_H_2(base, x, y, color) ((uint16_t *)(base))[(x) + ((y) * global_video_width)] = (color) & 0xFFFF
+#define SET_PIXEL_V_4(base, x, y, color) ((uint32_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)] = (color)
+#define SET_PIXEL_H_4(base, x, y, color) ((uint32_t *)(base))[(x) + ((y) * global_video_width)] = (color)
 
-#define SET_PIXEL_V_2_15 SET_PIXEL_V_2_31
-#define SET_PIXEL_H_2_15 SET_PIXEL_H_2_31
-#define SET_PIXEL_V_4_15 SET_PIXEL_V_4_31
-#define SET_PIXEL_H_4_15 SET_PIXEL_H_4_31
-
-#define GET_PIXEL_V_2_15 GET_PIXEL_V_2_31
-#define GET_PIXEL_H_2_15 GET_PIXEL_H_2_31
-#define GET_PIXEL_V_4_15 GET_PIXEL_V_4_31
-#define GET_PIXEL_H_4_15 GET_PIXEL_H_4_31
+#define GET_PIXEL_V_2(base, x, y) ((uint16_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)]
+#define GET_PIXEL_H_2(base, x, y) ((uint16_t *)(base))[(x) + ((y) * global_video_width)]
+#define GET_PIXEL_V_4(base, x, y) ((uint32_t *)(base))[(global_video_width - (y)) + ((x) * global_video_width)]
+#define GET_PIXEL_H_4(base, x, y) ((uint32_t *)(base))[(x) + ((y) * global_video_width)]
 
 #define RGB0555(r, g, b) ((((b) >> 3) & (0x1F << 0)) | (((g) << 2) & (0x1F << 5)) | (((r) << 7) & (0x1F << 10)) | 0x8000)
 #define RGB1555(r, g, b, a) ((((b) >> 3) & (0x1F << 0)) | (((g) << 2) & (0x1F << 5)) | (((r) << 7) & (0x1F << 10)) | (((a) << 8) & 0x8000))

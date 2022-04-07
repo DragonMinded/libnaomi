@@ -27,6 +27,7 @@ static uint32_t global_background_fill_start = 0;
 static uint32_t global_background_fill_end = 0;
 static uint32_t global_background_fill_color[8] = { 0 };
 static unsigned int global_background_set = 0;
+static unsigned int global_video_15khz = 0;
 
 // We only use two of these for rendering. The third is so we can
 // give a pointer out to scratch VRAM for other code to use.
@@ -47,7 +48,6 @@ unsigned int cached_actual_width = 0;
 unsigned int cached_actual_height = 0;
 unsigned int global_video_depth = 0;
 unsigned int global_video_vertical = 0;
-unsigned int global_video_15khz = 0;
 void *buffer_base = 0;
 
 // Our current framebuffer location, for double buffering. The current_buffer_loc
@@ -558,47 +558,21 @@ void video_fill_box(int x0, int y0, int x1, int y1, color_t color)
         uint32_t actualcolor = RGB0555(color.r, color.g, color.b);
         if(global_video_vertical)
         {
-            if (global_video_15khz)
+            for(int col = low_x; col <= high_x; col++)
             {
-                for(int col = low_x; col <= high_x; col++)
+                for(int row = high_y; row >= low_y; row--)
                 {
-                    for(int row = high_y; row >= low_y; row--)
-                    {
-                        SET_PIXEL_V_2_15(buffer_base, col, row, actualcolor);
-                    }
-                }
-            }
-            else
-            {
-                for(int col = low_x; col <= high_x; col++)
-                {
-                    for(int row = high_y; row >= low_y; row--)
-                    {
-                        SET_PIXEL_V_2_31(buffer_base, col, row, actualcolor);
-                    }
+                    SET_PIXEL_V_2(buffer_base, col, row, actualcolor);
                 }
             }
         }
         else
         {
-            if (global_video_15khz)
+            for(int row = low_y; row <= high_y; row++)
             {
-                for(int row = low_y; row <= high_y; row++)
+                for(int col = low_x; col <= high_x; col++)
                 {
-                    for(int col = low_x; col <= high_x; col++)
-                    {
-                        SET_PIXEL_H_2_15(buffer_base, col, row, actualcolor);
-                    }
-                }
-            }
-            else
-            {
-                for(int row = low_y; row <= high_y; row++)
-                {
-                    for(int col = low_x; col <= high_x; col++)
-                    {
-                        SET_PIXEL_H_2_31(buffer_base, col, row, actualcolor);
-                    }
+                    SET_PIXEL_H_2(buffer_base, col, row, actualcolor);
                 }
             }
         }
@@ -608,47 +582,21 @@ void video_fill_box(int x0, int y0, int x1, int y1, color_t color)
         uint32_t actualcolor = RGB0888(color.r, color.g, color.b);
         if(global_video_vertical)
         {
-            if (global_video_15khz)
+            for(int col = low_x; col <= high_x; col++)
             {
-                for(int col = low_x; col <= high_x; col++)
+                for(int row = high_y; row >= low_y; row--)
                 {
-                    for(int row = high_y; row >= low_y; row--)
-                    {
-                        SET_PIXEL_V_4_15(buffer_base, col, row, actualcolor);
-                    }
-                }
-            }
-            else
-            {
-                for(int col = low_x; col <= high_x; col++)
-                {
-                    for(int row = high_y; row >= low_y; row--)
-                    {
-                        SET_PIXEL_V_4_31(buffer_base, col, row, actualcolor);
-                    }
+                    SET_PIXEL_V_4(buffer_base, col, row, actualcolor);
                 }
             }
         }
         else
         {
-            if (global_video_15khz)
+            for(int row = low_y; row <= high_y; row++)
             {
-                for(int row = low_y; row <= high_y; row++)
+                for(int col = low_x; col <= high_x; col++)
                 {
-                    for(int col = low_x; col <= high_x; col++)
-                    {
-                        SET_PIXEL_H_4_15(buffer_base, col, row, actualcolor);
-                    }
-                }
-            }
-            else
-            {
-                for(int row = low_y; row <= high_y; row++)
-                {
-                    for(int col = low_x; col <= high_x; col++)
-                    {
-                        SET_PIXEL_H_4_31(buffer_base, col, row, actualcolor);
-                    }
+                    SET_PIXEL_H_4(buffer_base, col, row, actualcolor);
                 }
             }
         }
@@ -664,53 +612,25 @@ void video_draw_pixel(int x, int y, color_t color)
     if (global_video_depth == 2)
     {
         uint32_t actualcolor = RGB0555(color.r, color.g, color.b);
-        if (global_video_15khz)
+        if (global_video_vertical)
         {
-            if (global_video_vertical)
-            {
-                SET_PIXEL_V_2_15(buffer_base, x, y, actualcolor);
-            }
-            else
-            {
-                SET_PIXEL_H_2_15(buffer_base, x, y, actualcolor);
-            }
+            SET_PIXEL_V_2(buffer_base, x, y, actualcolor);
         }
         else
         {
-            if (global_video_vertical)
-            {
-                SET_PIXEL_V_2_31(buffer_base, x, y, actualcolor);
-            }
-            else
-            {
-                SET_PIXEL_H_2_31(buffer_base, x, y, actualcolor);
-            }
+            SET_PIXEL_H_2(buffer_base, x, y, actualcolor);
         }
     }
     else if(global_video_depth == 4)
     {
         uint32_t actualcolor = RGB0888(color.r, color.g, color.b);
-        if (global_video_15khz)
+        if (global_video_vertical)
         {
-            if (global_video_vertical)
-            {
-                SET_PIXEL_V_4_15(buffer_base, x, y, actualcolor);
-            }
-            else
-            {
-                SET_PIXEL_H_4_15(buffer_base, x, y, actualcolor);
-            }
+            SET_PIXEL_V_4(buffer_base, x, y, actualcolor);
         }
         else
         {
-            if (global_video_vertical)
-            {
-                SET_PIXEL_V_4_31(buffer_base, x, y, actualcolor);
-            }
-            else
-            {
-                SET_PIXEL_H_4_31(buffer_base, x, y, actualcolor);
-            }
+            SET_PIXEL_H_4(buffer_base, x, y, actualcolor);
         }
     }
 }
@@ -722,27 +642,13 @@ color_t video_get_pixel(int x, int y)
 
     if (global_video_depth == 2)
     {
-        if (global_video_15khz)
+        if (global_video_vertical)
         {
-            if (global_video_vertical)
-            {
-                color = GET_PIXEL_V_2_15(buffer_base, x, y);
-            }
-            else
-            {
-                color = GET_PIXEL_H_2_15(buffer_base, x, y);
-            }
+            color = GET_PIXEL_V_2(buffer_base, x, y);
         }
         else
         {
-            if (global_video_vertical)
-            {
-                color = GET_PIXEL_V_2_31(buffer_base, x, y);
-            }
-            else
-            {
-                color = GET_PIXEL_H_2_31(buffer_base, x, y);
-            }
+            color = GET_PIXEL_H_2(buffer_base, x, y);
         }
 
         retval.a = 0;
@@ -750,27 +656,13 @@ color_t video_get_pixel(int x, int y)
     }
     else if(global_video_depth == 4)
     {
-        if (global_video_15khz)
+        if (global_video_vertical)
         {
-            if (global_video_vertical)
-            {
-                color = GET_PIXEL_V_4_15(buffer_base, x, y);
-            }
-            else
-            {
-                color = GET_PIXEL_H_4_15(buffer_base, x, y);
-            }
+            color = GET_PIXEL_V_4(buffer_base, x, y);
         }
         else
         {
-            if (global_video_vertical)
-            {
-                color = GET_PIXEL_V_4_31(buffer_base, x, y);
-            }
-            else
-            {
-                color = GET_PIXEL_H_4_31(buffer_base, x, y);
-            }
+            color = GET_PIXEL_H_4(buffer_base, x, y);
         }
 
         retval.a = 0;
@@ -1036,14 +928,14 @@ void video_draw_debug_character(int x, int y, color_t color, char ch)
     }
 }
 
-#define UNROLLED_1BPP_ALPHA_BLEND(orientation, bitdepth, frequency) \
+#define UNROLLED_1BPP_ALPHA_BLEND(orientation, bitdepth) \
     uint16_t pixel = pixels[col + (row * width)]; \
     if (pixel & 0x8000) \
     { \
-        SET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + col, y + row, pixel); \
+        SET_PIXEL_ ## orientation ## _ ## bitdepth(buffer_base, x + col, y + row, pixel); \
     }
 
-#define UNROLLED_8BPP_ALPHA_BLEND(orientation, bitdepth, frequency) \
+#define UNROLLED_8BPP_ALPHA_BLEND(orientation, bitdepth) \
     uint32_t pixel = pixels[col + (row * width)]; \
     unsigned int alpha = (pixel >> 24) & 0xFF; \
     \
@@ -1051,7 +943,7 @@ void video_draw_debug_character(int x, int y, color_t color, char ch)
     { \
         if (alpha >= 255) \
         { \
-            SET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + col, y + row, pixel); \
+            SET_PIXEL_ ## orientation ## _ ## bitdepth(buffer_base, x + col, y + row, pixel); \
         } \
         else \
         { \
@@ -1066,13 +958,13 @@ void video_draw_debug_character(int x, int y, color_t color, char ch)
             unsigned int dg; \
             unsigned int db; \
             unsigned int negalpha = (~alpha) & 0xFF; \
-            EXPLODE0888(GET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + col, y + row), dr, dg, db); \
+            EXPLODE0888(GET_PIXEL_ ## orientation ## _ ## bitdepth(buffer_base, x + col, y + row), dr, dg, db); \
             \
             /* Technically it should be divided by 255, but this should be much much faster for an 0.4% accuracy loss. */ \
             dr = ((sr * alpha) + (dr * negalpha)) >> 8; \
             dg = ((sg * alpha) + (dg * negalpha)) >> 8; \
             db = ((sb * alpha) + (db * negalpha)) >> 8; \
-            SET_PIXEL_ ## orientation ## _ ## bitdepth ## _ ## frequency(buffer_base, x + col, y + row, RGB0888(dr, dg, db)); \
+            SET_PIXEL_ ## orientation ## _ ## bitdepth(buffer_base, x + col, y + row, RGB0888(dr, dg, db)); \
         } \
     } \
 
@@ -1126,47 +1018,21 @@ void video_draw_sprite(int x, int y, int width, int height, void *data)
 
         if(global_video_vertical)
         {
-            if (global_video_15khz)
+            for(int col = low_x; col < high_x; col++)
             {
-                for(int col = low_x; col < high_x; col++)
+                for(int row = (high_y - 1); row >= low_y; row--)
                 {
-                    for(int row = (high_y - 1); row >= low_y; row--)
-                    {
-                        UNROLLED_1BPP_ALPHA_BLEND(V, 2, 15);
-                    }
-                }
-            }
-            else
-            {
-                for(int col = low_x; col < high_x; col++)
-                {
-                    for(int row = (high_y - 1); row >= low_y; row--)
-                    {
-                        UNROLLED_1BPP_ALPHA_BLEND(V, 2, 31);
-                    }
+                    UNROLLED_1BPP_ALPHA_BLEND(V, 2);
                 }
             }
         }
         else
         {
-            if (global_video_15khz)
+            for(int row = low_y; row < high_y; row++)
             {
-                for(int row = low_y; row < high_y; row++)
+                for(int col = low_x; col < high_x; col++)
                 {
-                    for(int col = low_x; col < high_x; col++)
-                    {
-                        UNROLLED_1BPP_ALPHA_BLEND(H, 2, 15);
-                    }
-                }
-            }
-            else
-            {
-                for(int row = low_y; row < high_y; row++)
-                {
-                    for(int col = low_x; col < high_x; col++)
-                    {
-                        UNROLLED_1BPP_ALPHA_BLEND(H, 2, 31);
-                    }
+                    UNROLLED_1BPP_ALPHA_BLEND(H, 2);
                 }
             }
         }
@@ -1177,47 +1043,21 @@ void video_draw_sprite(int x, int y, int width, int height, void *data)
 
         if(global_video_vertical)
         {
-            if (global_video_15khz)
+            for(int col = low_x; col < high_x; col++)
             {
-                for(int col = low_x; col < high_x; col++)
+                for(int row = (high_y - 1); row >= low_y; row--)
                 {
-                    for(int row = (high_y - 1); row >= low_y; row--)
-                    {
-                        UNROLLED_8BPP_ALPHA_BLEND(V, 4, 15);
-                    }
-                }
-            }
-            else
-            {
-                for(int col = low_x; col < high_x; col++)
-                {
-                    for(int row = (high_y - 1); row >= low_y; row--)
-                    {
-                        UNROLLED_8BPP_ALPHA_BLEND(V, 4, 31);
-                    }
+                    UNROLLED_8BPP_ALPHA_BLEND(V, 4);
                 }
             }
         }
         else
         {
-            if (global_video_15khz)
+            for(int row = low_y; row < high_y; row++)
             {
-                for(int row = low_y; row < high_y; row++)
+                for(int col = low_x; col < high_x; col++)
                 {
-                    for(int col = low_x; col < high_x; col++)
-                    {
-                        UNROLLED_8BPP_ALPHA_BLEND(H, 4, 15);
-                    }
-                }
-            }
-            else
-            {
-                for(int row = low_y; row < high_y; row++)
-                {
-                    for(int col = low_x; col < high_x; col++)
-                    {
-                        UNROLLED_8BPP_ALPHA_BLEND(H, 4, 31);
-                    }
+                    UNROLLED_8BPP_ALPHA_BLEND(H, 4);
                 }
             }
         }
