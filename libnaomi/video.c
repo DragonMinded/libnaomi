@@ -343,11 +343,23 @@ void video_init(int colordepth)
     buffer_loc = next_buffer_loc;
     buffer_base = (void *)((VRAM_BASE + global_buffer_offset[current_buffer_loc]) | 0xA0000000);
 
-    // Set up vertical position.
-    videobase[POWERVR2_VPOS] = (
-        35 << 16 |  // Even position.
-        35 << 0     // Odd position.
-    );
+    // Set up vertical position. These values were chosen to match the
+    // Naomi BIOS CRT test screen as closely as possible.
+    if (global_video_15khz)
+    {
+        videobase[POWERVR2_VPOS] = (
+            22 << 16 |  // Even position.
+            22 << 0     // Odd position.
+        );
+    }
+    else
+    {
+        videobase[POWERVR2_VPOS] = (
+            35 << 16 |  // Even position.
+            35 << 0     // Odd position.
+        );
+    }
+
     videobase[POWERVR2_VBORDER] = (
         40 << 16 |                       // Start.
         (global_video_height + 40) << 0  // End.
@@ -373,8 +385,16 @@ void video_init(int colordepth)
         );
     }
 
-    // Set up horizontal position.
-    videobase[POWERVR2_HPOS] = 166;
+    // Set up horizontal position. These values were chose to match the
+    // Naomi BIOS CRT test screen as closely as possible.
+    if (global_video_15khz)
+    {
+        videobase[POWERVR2_HPOS] = 164;
+    }
+    else
+    {
+        videobase[POWERVR2_HPOS] = 166;
+    }
 
     // Set up refresh rate. It looks like the official bios uses 529/851 for 31khz
     // and 536/851 for 15khz mode. Not sure why it matters aside from interrupt generation.
