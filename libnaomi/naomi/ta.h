@@ -336,6 +336,9 @@ uint32_t ta_palette_entry(color_t color);
 // RAM do not also use ta_texture_malloc().
 void *ta_texture_base();
 
+// Get the size in bytes of the base texture RAM that is safe to use.
+unsigned int ta_texture_size();
+
 // Given a uvsize (allowed sizes are 8, 16, 32, 64, 128, 256, 512 or 1024), allocate space
 // in the texture RAM suitable for a square texture of size uvsize. If there is not enough
 // room in the texture RAM, returns a null pointer. Note that the returned pointer is in

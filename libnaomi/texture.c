@@ -44,7 +44,10 @@ static allocated_texture_t *head = 0;
 static int initialized = 0;
 static mutex_t texalloc_mutex;
 
-#define TEXRAM_HIGH ((UNCACHED_MIRROR | TEXRAM_BASE) + TEXRAM_SIZE)
+uint32_t _ta_texture_top()
+{
+    return (uint32_t)ta_texture_base() + ta_texture_size();
+}
 
 void _ta_init_texture_allocator()
 {
@@ -75,7 +78,7 @@ void _ta_init_texture_allocator()
 
     // Set up the location and size of the head chunk.
     head->offset = (uint32_t)ta_texture_base();
-    head->size = TEXRAM_HIGH - head->offset;
+    head->size = ta_texture_size();
 }
 
 void *ta_texture_malloc(int uvsize, int bitsize)
@@ -170,7 +173,7 @@ void *ta_texture_malloc(int uvsize, int bitsize)
                     head = newchunk;
                 }
 
-                uint32_t offset = potential->next ? potential->next->offset : TEXRAM_HIGH;
+                uint32_t offset = potential->next ? potential->next->offset : _ta_texture_top();
                 if (newchunk->offset + newchunk->size + potential->size != offset)
                 {
                     _irq_display_invariant("texture allocator failure", "failed invariant check on line %d with current chunk size!", __LINE__);
@@ -236,7 +239,7 @@ void ta_texture_free(void *texture)
 
                 free(collapsible);
 
-                uint32_t offset = cur->next ? cur->next->offset : TEXRAM_HIGH;
+                uint32_t offset = cur->next ? cur->next->offset : _ta_texture_top();
                 if (cur->offset + cur->size != offset)
                 {
                     _irq_display_invariant("texture allocator failure", "failed invariant check on line %d with current chunk size!", __LINE__);
@@ -266,7 +269,7 @@ void ta_texture_free(void *texture)
 
                 free(cur);
 
-                uint32_t offset = collapsible->next ? collapsible->next->offset : TEXRAM_HIGH;
+                uint32_t offset = collapsible->next ? collapsible->next->offset : _ta_texture_top();
                 if (collapsible->offset + collapsible->size != offset)
                 {
                     _irq_display_invariant("texture allocator failure", "failed invariant check on line %d with current chunk size!", __LINE__);
@@ -285,7 +288,7 @@ struct mallinfo ta_texture_mallinfo()
     if (head != 0)
     {
         mutex_lock(&texalloc_mutex);
-        info.arena = TEXRAM_HIGH - head->offset;
+        info.arena = _ta_texture_top() - head->offset;
 
         size_t uordblks = 0;
         size_t fordblks = 0;

@@ -81,6 +81,11 @@ void _irq_disable_debugging()
     disable_debugging = 1;
 }
 
+// Prototype for initializing the video system with no TA, because we want to display
+// the most simple system possible. The TA itself has some invariant displays, so if
+// we attempt to initialize it, we will get infinite recursion.
+void _video_init(int colordepth, int init_ta);
+
 void _irq_display_exception(int signal, irq_state_t *cur_state, char *failure, int code)
 {
     // Threads should already be disabled, but lets be sure.
@@ -90,7 +95,7 @@ void _irq_display_exception(int signal, irq_state_t *cur_state, char *failure, i
     _gdb_set_haltreason(signal, cur_state);
 
     // (Re-)init video to a known state to display the exception.
-    video_init(VIDEO_COLOR_1555);
+    _video_init(VIDEO_COLOR_1555, 0);
     console_set_visible(0);
     video_set_background_color(rgb(48, 0, 0));
 
@@ -139,7 +144,7 @@ void _irq_display_invariant(char *msg, char *failure, ...)
     // Inform GDB why we halted.
     _gdb_set_haltreason(SIGABRT, irq_state);
 
-    video_init(VIDEO_COLOR_1555);
+    _video_init(VIDEO_COLOR_1555, 0);
     console_set_visible(0);
     video_set_background_color(rgb(48, 0, 0));
 

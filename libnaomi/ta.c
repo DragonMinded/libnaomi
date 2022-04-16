@@ -119,6 +119,7 @@ struct ta_buffers
     void *tile_descriptors;
     /* The safe spot to start storing texxtures in RAM. */
     void *texture_ram;
+    int texture_ram_size;
 };
 
 /* Set up buffers and descriptors for a tilespace */
@@ -195,6 +196,7 @@ uint32_t _ta_set_target(struct ta_buffers *buffers, int tile_width, int tile_hei
 {
     volatile unsigned int *videobase = (volatile unsigned int *)POWERVR2_BASE;
     unsigned int cmdl = ((unsigned int)buffers->cmd_list) & 0x00ffffff;
+    unsigned int tileobjbuf = ((unsigned int)buffers->opaque_object_buffer) & 0x00ffffff;
     unsigned int objbuf = ((unsigned int)buffers->overflow_buffer) & 0x00ffffff;
 
     /* Reset TA */
@@ -202,8 +204,8 @@ uint32_t _ta_set_target(struct ta_buffers *buffers, int tile_width, int tile_hei
     videobase[POWERVR2_RESET] = 0x0;
 
     /* Set the tile buffer base in the TA, grows downward. */
-    videobase[POWERVR2_OBJBUF_BASE] = objbuf + buffers->overflow_buffer_size;
-    videobase[POWERVR2_OBJBUF_LIMIT] = objbuf;
+    videobase[POWERVR2_OBJBUF_BASE] = tileobjbuf;
+    videobase[POWERVR2_OBJBUF_LIMIT] = objbuf + buffers->overflow_buffer_size;
 
     /* Set the command list base in the TA, grows upward. */
     videobase[POWERVR2_CMDLIST_BASE] = cmdl;
@@ -213,7 +215,7 @@ uint32_t _ta_set_target(struct ta_buffers *buffers, int tile_width, int tile_hei
     videobase[POWERVR2_TILE_CLIP] = ((tile_height - 1) << 16) | (tile_width - 1);
 
     /* Set the location for object buffers if we run out in our tile descriptors. */
-    videobase[POWERVR2_ADDITIONAL_OBJBUF] = objbuf + buffers->overflow_buffer_size;
+    videobase[POWERVR2_ADDITIONAL_OBJBUF] = objbuf;
 
     /* Figure out blocksizes for below. */
     int opaque_blocksize = BLOCKSIZE_NOT_USED;
@@ -260,7 +262,7 @@ uint32_t _ta_set_target(struct ta_buffers *buffers, int tile_width, int tile_hei
 
     /* Set up object block sizes and such. */
     videobase[POWERVR2_TA_BLOCKSIZE] = (
-        (1 << 20) |                     // Grow downward in memory
+        (0 << 20) |                     // Grow upward in memory
         (punchthru_blocksize << 16) |   // Punch-through polygon blocksize
         (BLOCKSIZE_NOT_USED << 12) |    // Translucent polygon modifier blocksize
         (transparent_blocksize << 8) |  // Translucent polygon blocksize
@@ -346,7 +348,6 @@ extern uint32_t global_buffer_offset[3];
 #define TA_CMDLIST_SIZE (1 * 1024 * 1024)
 #define TA_BACKGROUNDLIST_SIZE 256
 #define TA_OVERFLOW_SIZE (1 * 1024 * 1024)
-#define TA_SCRATCH_SIZE (1024 * 128)
 
 // Alignment required for various buffers.
 #define BUFFER_ALIGNMENT 128
@@ -361,7 +362,7 @@ void _ta_init_buffers()
     // to a 1MB boundary (masking with 0xFFFFF should give all 0's). It should
     // be safe to calculate where to put this based on the framebuffer locations,
     // but for some reason this results in stomped on texture RAM.
-    uint32_t bufloc = ((((global_buffer_offset[2] + TA_SCRATCH_SIZE) & VRAM_MASK) | UNCACHED_MIRROR | VRAM_BASE) + 0xFFFFF) & 0xFFF00000;
+    uint32_t bufloc = ((((global_buffer_offset[2] + video_scratch_size()) & VRAM_MASK) | UNCACHED_MIRROR | VRAM_BASE) + 0xFFFFF) & 0xFFF00000;
     uint32_t curbufloc = bufloc;
 
     // Clear our structure out.
@@ -378,10 +379,9 @@ void _ta_init_buffers()
     ta_working_buffers.background_list_size = TA_BACKGROUNDLIST_SIZE;
     curbufloc = ENSURE_ALIGNMENT(curbufloc + TA_BACKGROUNDLIST_SIZE);
 
-    // Now, allocate space for extra object buffer overflow.
-    ta_working_buffers.overflow_buffer = (void *)curbufloc;
-    ta_working_buffers.overflow_buffer_size = TA_OVERFLOW_SIZE;
-    curbufloc = ENSURE_ALIGNMENT(curbufloc + TA_OVERFLOW_SIZE);
+    // Now, grab space for the tile descriptors themselves.
+    ta_working_buffers.tile_descriptors = (void *)curbufloc;
+    curbufloc = ENSURE_ALIGNMENT(curbufloc + (4 * (6 * ((MAX_H_TILE * MAX_V_TILE) + 1))));
 
     // Now, allocate space for the polygon object buffers.
     ta_working_buffers.opaque_object_buffer = (void *)curbufloc;
@@ -396,12 +396,19 @@ void _ta_init_buffers()
     ta_working_buffers.punchthru_object_buffer_size = TA_PUNCHTHRU_OBJECT_BUFFER_SIZE;
     curbufloc = ENSURE_ALIGNMENT(curbufloc + (TA_PUNCHTHRU_OBJECT_BUFFER_SIZE * MAX_H_TILE * MAX_V_TILE));
 
-    // Finally, grab space for the tile descriptors themselves.
-    ta_working_buffers.tile_descriptors = (void *)curbufloc;
-    curbufloc = ENSURE_ALIGNMENT(curbufloc + (4 * (6 * ((MAX_H_TILE * MAX_V_TILE) + 1))));
+    // Now, allocate space for extra object buffer overflow.
+    ta_working_buffers.overflow_buffer = (void *)curbufloc;
+    ta_working_buffers.overflow_buffer_size = TA_OVERFLOW_SIZE;
+    curbufloc = ENSURE_ALIGNMENT(curbufloc + TA_OVERFLOW_SIZE);
+
+    if (curbufloc > ((UNCACHED_MIRROR | VRAM_BASE) + VRAM_SIZE))
+    {
+        _irq_display_invariant("TA init failure", "allocated VRAM outside of allowed memory map!");
+    }
 
     // Now, the remaining space can be used for texture RAM.
-    ta_working_buffers.texture_ram = (void *)((curbufloc & VRAM_MASK) | UNCACHED_MIRROR | TEXRAM_BASE);
+    ta_working_buffers.texture_ram = (void *)(UNCACHED_MIRROR | TEXRAM_BASE);
+    ta_working_buffers.texture_ram_size = global_buffer_offset[0];
 
     // Clear the above memory so we don't get artifacts.
     if (hw_memset((void *)bufloc, 0, curbufloc - bufloc) == 0)
@@ -723,6 +730,11 @@ uint32_t ta_palette_entry(color_t color)
 void *ta_texture_base()
 {
     return ta_working_buffers.texture_ram;
+}
+
+unsigned int ta_texture_size()
+{
+    return ta_working_buffers.texture_ram_size;
 }
 
 int ta_round_uvsize(int uvsize)

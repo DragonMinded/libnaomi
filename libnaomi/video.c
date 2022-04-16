@@ -21,6 +21,15 @@
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
+// We stick the VRAM area in the last 6 MB of texture RAM, with the TA-specific
+// VRAM setup directly after that. This leaves 10MB of space left for textures
+// themselves.
+#define GLOBAL_BUFFER_BASE_OFFSET (10 * (1024 * 1024))
+
+// The size of the VRAM scratch area that can be used by anyone, it is effectively
+// the 3rd double-buffer location.
+#define GLOBAL_BUFFER_SCRATCH_SIZE (1024 * 128)
+
 // Static members that don't need to be accessed anywhere else.
 static uint32_t global_background_color = 0;
 static uint32_t global_background_fill_start = 0;
@@ -67,7 +76,7 @@ void video_display_on_vblank()
     // Handle filling the background of the other screen while we wait.
     if (global_background_set)
     {
-        global_background_fill_start = ((VRAM_BASE + global_buffer_offset[next_buffer_loc]) | 0xA0000000);
+        global_background_fill_start = ((VRAM_BASE + global_buffer_offset[next_buffer_loc]) | UNCACHED_MIRROR);
         global_background_fill_end = global_background_fill_start + ((global_video_width * global_video_height * global_video_depth));
     }
     else
@@ -91,7 +100,7 @@ void video_display_on_vblank()
 
         // Swap buffer pointer in SW.
         buffer_loc = next_buffer_loc;
-        buffer_base = (void *)((VRAM_BASE + global_buffer_offset[current_buffer_loc]) | 0xA0000000);
+        buffer_base = (void *)((VRAM_BASE + global_buffer_offset[current_buffer_loc]) | UNCACHED_MIRROR);
     }
     else
     {
@@ -104,7 +113,7 @@ void video_display_on_vblank()
 
         // Swap buffer pointer in SW.
         buffer_loc = next_buffer_loc;
-        buffer_base = (void *)((VRAM_BASE + global_buffer_offset[current_buffer_loc]) | 0xA0000000);
+        buffer_base = (void *)((VRAM_BASE + global_buffer_offset[current_buffer_loc]) | UNCACHED_MIRROR);
 
         // No longer need our high priority status, yield to other threads.
         thread_yield();
@@ -244,7 +253,7 @@ void _video_set_ta_registers()
     }
 }
 
-void video_init(int colordepth)
+void _video_init(int colordepth, int init_ta)
 {
     if (colordepth != VIDEO_COLOR_1555 && colordepth != VIDEO_COLOR_8888)
     {
@@ -260,7 +269,7 @@ void video_init(int colordepth)
     global_video_depth = colordepth;
     global_background_color = 0;
     global_background_set = 0;
-    global_buffer_offset[0] = 0;
+    global_buffer_offset[0] = GLOBAL_BUFFER_BASE_OFFSET;
     global_buffer_offset[1] = global_buffer_offset[0] + (global_video_width * global_video_height * global_video_depth);
     global_buffer_offset[2] = global_buffer_offset[1] + (global_video_width * global_video_height * global_video_depth);
 
@@ -286,10 +295,13 @@ void video_init(int colordepth)
     }
 
     // Now, initialize the tile accelerator so it can be used for drawing.
-    _ta_init();
+    if (init_ta)
+    {
+        _ta_init();
+    }
 
     // Now, zero out the screen so there's no garbage if we never display.
-    void *zero_base = (void *)(VRAM_BASE | 0xA0000000);
+    void *zero_base = (void *)((VRAM_BASE + global_buffer_offset[0]) | UNCACHED_MIRROR);
     if (!hw_memset(zero_base, 0, global_video_width * global_video_height * global_video_depth * 2))
     {
         // Gotta do the slow method.
@@ -341,7 +353,7 @@ void video_init(int colordepth)
 
     // Swap buffer pointer in SW.
     buffer_loc = next_buffer_loc;
-    buffer_base = (void *)((VRAM_BASE + global_buffer_offset[current_buffer_loc]) | 0xA0000000);
+    buffer_base = (void *)((VRAM_BASE + global_buffer_offset[current_buffer_loc]) | UNCACHED_MIRROR);
 
     // Set up vertical position. These values were chosen to match the
     // Naomi BIOS CRT test screen as closely as possible.
@@ -446,10 +458,18 @@ void video_init(int colordepth)
     while((videobase[POWERVR2_SYNC_STAT] & 0x1FF) != vblank_in_position) { ; }
 
     // Now, ask the TA to set up its buffers since we have working video now.
-    _ta_init_buffers();
+    if (init_ta)
+    {
+        _ta_init_buffers();
+    }
 
     // Finally, its safe to enable interrupts and move on.
     irq_restore(old_interrupts);
+}
+
+void video_init(int colordepth)
+{
+    _video_init(colordepth, 1);
 }
 
 void video_free()
@@ -1148,5 +1168,10 @@ void video_draw_debug_text(int x, int y, color_t color, const char * const msg, 
 
 void *video_scratch_area()
 {
-    return(void *)((VRAM_BASE + global_buffer_offset[2]) | 0xA0000000);
+    return(void *)((VRAM_BASE + global_buffer_offset[2]) | UNCACHED_MIRROR);
+}
+
+unsigned int video_scratch_size()
+{
+    return GLOBAL_BUFFER_SCRATCH_SIZE;
 }

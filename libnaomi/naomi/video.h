@@ -69,6 +69,9 @@ void *video_framebuffer();
 // hardware acceleration.
 void *video_scratch_area();
 
+// The size in bytes of the above scratch area (as documented above).
+unsigned int video_scratch_size();
+
 // Returns nonzero if the screen is in vertical orientation, or zero if
 // the screen is in horizontal orientation. This is for convenience, the
 // pixel-based drawing functions always treat the top left of the screen
