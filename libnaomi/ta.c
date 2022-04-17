@@ -103,23 +103,18 @@ struct ta_buffers
     /* Background command list. Cleverly stuck where we otherwise needed a buffer */
     void *background_list;
     int background_list_size;
-    /* Additional object buffers for overflow. */
-    void *overflow_buffer;
-    int overflow_buffer_size;
-    /* Opaque polygons */
-    void *opaque_object_buffer;
-    int opaque_object_buffer_size;
-    /* Transparent polygons */
-    void *transparent_object_buffer;
-    int transparent_object_buffer_size;
-    /* Punch-Thru polygons */
-    void *punchthru_object_buffer;
-    int punchthru_object_buffer_size;
+    /* The base location of all object buffers, created by the TA. */
+    void *object_list;
+    int object_list_size;;
     /* The individual tile descriptors for the 32x32 tiles. */
     void *tile_descriptors;
     /* The safe spot to start storing texxtures in RAM. */
     void *texture_ram;
     int texture_ram_size;
+    /* The settings for each object buffer size. We don't support volume modifiers. */
+    int opaque_object_buffer_size;
+    int transparent_object_buffer_size;
+    int punchthru_object_buffer_size;
 };
 
 /* Set up buffers and descriptors for a tilespace */
@@ -127,9 +122,7 @@ void _ta_create_tile_descriptors(struct ta_buffers *buffers, int tile_width, int
 {
     /* Each tile uses 64 bytes of buffer space.  So buf must point to 64*w*h bytes of data */
     unsigned int *vr = buffers->tile_descriptors;
-    unsigned int opaquebase = ((unsigned int)buffers->opaque_object_buffer) & 0x00ffffff;
-    unsigned int transparentbase = ((unsigned int)buffers->transparent_object_buffer) & 0x00ffffff;
-    unsigned int punchthrubase = ((unsigned int)buffers->punchthru_object_buffer) & 0x00ffffff;
+    unsigned int olbase = ((unsigned int)buffers->object_list) & 0xffffff;
 
     /* It seems the hardware needs a dummy tile or it renders the first tile weird. */
     *vr++ = 0x10000000;
@@ -145,6 +138,9 @@ void _ta_create_tile_descriptors(struct ta_buffers *buffers, int tile_width, int
     {
         for (int y = 0; y < tile_height; y++)
         {
+            // Calculate the actual tile position from our object lists.
+            int tile_pos = x + (y * tile_width);
+
             // Set end of buffer, set tile position
             int eob = (x == (tile_width - 1) && y == (tile_height - 1)) ? 0x80000000 : 0x00000000;
             *vr++ = eob | (y << 8) | (x << 2);
@@ -152,7 +148,7 @@ void _ta_create_tile_descriptors(struct ta_buffers *buffers, int tile_width, int
             // Opaque polygons.
             if (buffers->opaque_object_buffer_size > 0 && (populated_lists & WAITING_LIST_OPAQUE) != 0)
             {
-                last_address = opaquebase + ((x + (y * tile_width)) * buffers->opaque_object_buffer_size);
+                last_address = olbase + ((tile_pos) * buffers->opaque_object_buffer_size);
                 *vr++ = last_address;
             }
             else
@@ -166,7 +162,11 @@ void _ta_create_tile_descriptors(struct ta_buffers *buffers, int tile_width, int
             // Translucent polygons.
             if (buffers->transparent_object_buffer_size > 0 && (populated_lists & WAITING_LIST_TRANSPARENT) != 0)
             {
-                last_address = transparentbase + ((x + (y * tile_width)) * buffers->transparent_object_buffer_size);
+                last_address = (
+                    olbase +
+                    (tile_width * tile_height * buffers->opaque_object_buffer_size) +
+                    ((tile_pos) * buffers->transparent_object_buffer_size)
+                );
                 *vr++ = last_address;
             }
             else
@@ -180,7 +180,18 @@ void _ta_create_tile_descriptors(struct ta_buffers *buffers, int tile_width, int
             // Punch-through (or solid/transparent-only) polygons.
             if (buffers->punchthru_object_buffer_size > 0 && (populated_lists & WAITING_LIST_PUNCHTHRU) != 0)
             {
-                last_address = punchthrubase + ((x + (y * tile_width)) * buffers->punchthru_object_buffer_size);
+                last_address = (
+                    olbase +
+                    (
+                        tile_width *
+                        tile_height *
+                        (
+                            buffers->opaque_object_buffer_size +
+                            buffers->transparent_object_buffer_size
+                        )
+                    ) +
+                    ((tile_pos) * buffers->transparent_object_buffer_size)
+                );
                 *vr++ = last_address;
             }
             else
@@ -196,26 +207,23 @@ uint32_t _ta_set_target(struct ta_buffers *buffers, int tile_width, int tile_hei
 {
     volatile unsigned int *videobase = (volatile unsigned int *)POWERVR2_BASE;
     unsigned int cmdl = ((unsigned int)buffers->cmd_list) & 0x00ffffff;
-    unsigned int tileobjbuf = ((unsigned int)buffers->opaque_object_buffer) & 0x00ffffff;
-    unsigned int objbuf = ((unsigned int)buffers->overflow_buffer) & 0x00ffffff;
+    unsigned int objl = ((unsigned int)buffers->object_list) & 0x00ffffff;
 
     /* Reset TA */
     videobase[POWERVR2_RESET] = 0x3;
     videobase[POWERVR2_RESET] = 0x0;
 
-    /* Set the tile buffer base in the TA, grows downward. */
-    videobase[POWERVR2_OBJBUF_BASE] = tileobjbuf;
-    videobase[POWERVR2_OBJBUF_LIMIT] = objbuf + buffers->overflow_buffer_size;
+    /* Set the tile buffer base in the TA, grows upwards, making sure the top limit is inclusive
+     * but also aligned to a 32-byte boundary. */
+    videobase[POWERVR2_OBJBUF_BASE] = objl;
+    videobase[POWERVR2_OBJBUF_LIMIT] = (objl + buffers->object_list_size - 1) & 0xFFFFFFE0;
 
-    /* Set the command list base in the TA, grows upward. */
+    /* Set the command list base in the TA, grows upward, same rules as above. */
     videobase[POWERVR2_CMDLIST_BASE] = cmdl;
-    videobase[POWERVR2_CMDLIST_LIMIT] = cmdl + buffers->cmd_list_size;
+    videobase[POWERVR2_CMDLIST_LIMIT] = (cmdl + buffers->cmd_list_size - 1) & 0xFFFFFFE0;
 
     /* Set the number of tiles we have in the tile descriptor. */
     videobase[POWERVR2_TILE_CLIP] = ((tile_height - 1) << 16) | (tile_width - 1);
-
-    /* Set the location for object buffers if we run out in our tile descriptors. */
-    videobase[POWERVR2_ADDITIONAL_OBJBUF] = objbuf;
 
     /* Figure out blocksizes for below. */
     int opaque_blocksize = BLOCKSIZE_NOT_USED;
@@ -231,6 +239,10 @@ uint32_t _ta_set_target(struct ta_buffers *buffers, int tile_width, int tile_hei
     {
         opaque_blocksize = BLOCKSIZE_128;
     }
+    else
+    {
+        _irq_display_invariant("TA init failure", "invalid opaque block size %d!", opaque_blocksize);
+    }
 
     int transparent_blocksize = BLOCKSIZE_NOT_USED;
     if (buffers->transparent_object_buffer_size == 32)
@@ -244,6 +256,10 @@ uint32_t _ta_set_target(struct ta_buffers *buffers, int tile_width, int tile_hei
     else if (buffers->transparent_object_buffer_size == 128)
     {
         transparent_blocksize = BLOCKSIZE_128;
+    }
+    else
+    {
+        _irq_display_invariant("TA init failure", "invalid transparent block size %d!", opaque_blocksize);
     }
 
     int punchthru_blocksize = BLOCKSIZE_NOT_USED;
@@ -259,6 +275,10 @@ uint32_t _ta_set_target(struct ta_buffers *buffers, int tile_width, int tile_hei
     {
         punchthru_blocksize = BLOCKSIZE_128;
     }
+    else
+    {
+        _irq_display_invariant("TA init failure", "invalid punchthru block size %d!", opaque_blocksize);
+    }
 
     /* Set up object block sizes and such. */
     videobase[POWERVR2_TA_BLOCKSIZE] = (
@@ -269,6 +289,20 @@ uint32_t _ta_set_target(struct ta_buffers *buffers, int tile_width, int tile_hei
         (BLOCKSIZE_NOT_USED << 4) |     // Opaque polygon modifier blocksize
         (opaque_blocksize << 0)         // Opaque polygon blocksize
     );
+
+    unsigned int list_size = (
+        (
+            buffers->opaque_object_buffer_size +
+            buffers->transparent_object_buffer_size +
+            buffers->punchthru_object_buffer_size
+        ) *
+        tile_width *
+        tile_height
+    );
+
+    /* Set the location for additional object buffers if we run out of the
+     * allocated ones from the above block sizes. */
+    videobase[POWERVR2_ADDITIONAL_OBJBUF] = objl + list_size;
 
     /* Confirm the above settings. */
     videobase[POWERVR2_TA_CONFIRM] = 0x80000000;
@@ -345,12 +379,12 @@ extern uint32_t global_buffer_offset[3];
 #define TA_OPAQUE_OBJECT_BUFFER_SIZE 128
 #define TA_TRANSPARENT_OBJECT_BUFFER_SIZE 128
 #define TA_PUNCHTHRU_OBJECT_BUFFER_SIZE 64
-#define TA_CMDLIST_SIZE (1 * 1024 * 1024)
 #define TA_BACKGROUNDLIST_SIZE 256
-#define TA_OVERFLOW_SIZE (1 * 1024 * 1024)
+#define TA_CMDLIST_SIZE ((1 * 1024 * 1024) - TA_BACKGROUNDLIST_SIZE)
+#define TA_OBJLIST_SIZE (1 * 1024 * 1024)
 
 // Alignment required for various buffers.
-#define BUFFER_ALIGNMENT 128
+#define BUFFER_ALIGNMENT 32
 #define ENSURE_ALIGNMENT(x) (((x) + (BUFFER_ALIGNMENT - 1)) & (~(BUFFER_ALIGNMENT - 1)))
 
 // Prototype from texture.c for managing textures in VRAM.
@@ -379,27 +413,19 @@ void _ta_init_buffers()
     ta_working_buffers.background_list_size = TA_BACKGROUNDLIST_SIZE;
     curbufloc = ENSURE_ALIGNMENT(curbufloc + TA_BACKGROUNDLIST_SIZE);
 
+    // Now, allocate space for object buffers.
+    ta_working_buffers.object_list = (void *)curbufloc;
+    ta_working_buffers.object_list_size = TA_OBJLIST_SIZE;
+    curbufloc = ENSURE_ALIGNMENT(curbufloc + TA_OBJLIST_SIZE);
+
+    // Also specify the sizes of each of our lists.
+    ta_working_buffers.opaque_object_buffer_size = TA_OPAQUE_OBJECT_BUFFER_SIZE;
+    ta_working_buffers.transparent_object_buffer_size = TA_TRANSPARENT_OBJECT_BUFFER_SIZE;
+    ta_working_buffers.punchthru_object_buffer_size = TA_PUNCHTHRU_OBJECT_BUFFER_SIZE;
+
     // Now, grab space for the tile descriptors themselves.
     ta_working_buffers.tile_descriptors = (void *)curbufloc;
     curbufloc = ENSURE_ALIGNMENT(curbufloc + (4 * (6 * ((MAX_H_TILE * MAX_V_TILE) + 1))));
-
-    // Now, allocate space for the polygon object buffers.
-    ta_working_buffers.opaque_object_buffer = (void *)curbufloc;
-    ta_working_buffers.opaque_object_buffer_size = TA_OPAQUE_OBJECT_BUFFER_SIZE;
-    curbufloc = ENSURE_ALIGNMENT(curbufloc + (TA_OPAQUE_OBJECT_BUFFER_SIZE * MAX_H_TILE * MAX_V_TILE));
-
-    ta_working_buffers.transparent_object_buffer = (void *)curbufloc;
-    ta_working_buffers.transparent_object_buffer_size = TA_TRANSPARENT_OBJECT_BUFFER_SIZE;
-    curbufloc = ENSURE_ALIGNMENT(curbufloc + (TA_TRANSPARENT_OBJECT_BUFFER_SIZE * MAX_H_TILE * MAX_V_TILE));
-
-    ta_working_buffers.punchthru_object_buffer = (void *)curbufloc;
-    ta_working_buffers.punchthru_object_buffer_size = TA_PUNCHTHRU_OBJECT_BUFFER_SIZE;
-    curbufloc = ENSURE_ALIGNMENT(curbufloc + (TA_PUNCHTHRU_OBJECT_BUFFER_SIZE * MAX_H_TILE * MAX_V_TILE));
-
-    // Now, allocate space for extra object buffer overflow.
-    ta_working_buffers.overflow_buffer = (void *)curbufloc;
-    ta_working_buffers.overflow_buffer_size = TA_OVERFLOW_SIZE;
-    curbufloc = ENSURE_ALIGNMENT(curbufloc + TA_OVERFLOW_SIZE);
 
     if (curbufloc > ((UNCACHED_MIRROR | VRAM_BASE) + VRAM_SIZE))
     {
@@ -509,7 +535,7 @@ void _ta_begin_render(struct ta_buffers *buffers, void *scrn, float zclip)
     unsigned int cmdl = ((unsigned int)buffers->cmd_list) & VRAM_MASK;
     unsigned int tls = ((unsigned int)buffers->tile_descriptors) & VRAM_MASK;
     unsigned int scn = ((unsigned int)scrn) & VRAM_MASK;
-    unsigned int bgl = (unsigned int)buffers->background_list - cmdl;
+    unsigned int bgl = (unsigned int)buffers->background_list - (unsigned int)buffers->cmd_list;
 
     /* Actually populate the tile descriptors themselves, pointing at the object buffers we just allocated.
      * We do this here every frame so we can exclude list types for lists that we definitely have no

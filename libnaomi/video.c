@@ -22,8 +22,11 @@
 #endif
 
 // We stick the VRAM area in the last 6 MB of texture RAM, with the TA-specific
-// VRAM setup directly after that. This leaves 10MB of space left for textures
-// themselves.
+// VRAM setup directly after that. This leaves 11MB of space left for textures
+// themselves. The calculated size is based on three 640x480 buffers at 32BPP, plus
+// a 128kb space for scratch buffers, plus two 1MB sections for the TA's display
+// lists and stuff. This is about 5.5MB and the TA needs things aligned on a 1MB
+// boundary, so we round up to 5.
 #define GLOBAL_BUFFER_BASE_OFFSET (10 * (1024 * 1024))
 
 // The size of the VRAM scratch area that can be used by anyone, it is effectively
