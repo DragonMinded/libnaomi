@@ -1,6 +1,10 @@
 # Set a default optimization level if the makefile didn't request one.
 OPTIMIZATION_LEVEL ?= -O3
 
+# Set a default C standard and C++ standard.
+CSTD ?=
+CPPSTD ?=
+
 # Our venv python3 so that dependencies work properly.
 VENV_PYTHON3 := ${NAOMI_BASE}/tools/pyenv/bin/python3
 
@@ -37,6 +41,8 @@ NAOMI_SH_CCFLAGS += ${OPTIMIZATION_LEVEL}
 NAOMI_SH_CCFLAGS += -Wall
 # Produce debug information so addr2line works.
 NAOMI_SH_CCFLAGS += -g
+# Add on C standard if present.
+NAOMI_SH_CCFLAGS += $(if $(CSTD), -std=$(CSTD),)
 
 # Set up gcc default options for compiling .c files.
 CC  = ${NAOMI_SH_CC} ${NAOMI_SH_CCFLAGS}
@@ -63,6 +69,8 @@ NAOMI_SH_CPPFLAGS += ${OPTIMIZATION_LEVEL}
 NAOMI_SH_CPPFLAGS += -Wall
 # Produce debug information so addr2line works.
 NAOMI_SH_CPPFLAGS += -g
+# Add on C++ standard if present.
+NAOMI_SH_CPPFLAGS += $(if $(CPPSTD), -std=$(CPPSTD),)
 
 # Set up gcc default options for compiling .cpp files.
 CPP  = ${NAOMI_SH_CPP} ${NAOMI_SH_CPPFLAGS}
@@ -185,6 +193,9 @@ SRCS ?=
 # A list of libraries that should be linked against.
 LIBS ?=
 
+# A list of flags to pass to C/C++ compiler.
+FLAGS ?=
+
 # The actual bin file that we want to compile before attaching a rom header to it.
 NAOMI_BIN_FILE ?= build/naomi.bin
 
@@ -215,7 +226,7 @@ IMGOBJS = $(patsubst %.jpg, build/%.o, $(patsubst %.png, build/%.o, ${FONTOBJS})
 OBJS = ${IMGOBJS}
 
 # Any extra defines we want available to all homebrew programs.
-EXTRA_DEFINES = -DSERIAL=\"${SERIAL}\" -DBUILD_DATE=$(shell ${DATE}) -DSTART_ADDR=${START_ADDR}
+EXTRA_DEFINES = -DSERIAL=\"${SERIAL}\" -DBUILD_DATE=$(shell ${DATE}) -DSTART_ADDR=${START_ADDR} ${FLAGS}
 
 # Feature flags for 3rd party libraries.
 ifeq ($(call libmissing,freetype), 0)
