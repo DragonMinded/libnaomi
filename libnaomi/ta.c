@@ -374,14 +374,12 @@ void ta_set_background_color(color_t color)
 extern void *buffer_base;
 extern uint32_t global_buffer_offset[3];
 
-#define MAX_H_TILE (640/32)
-#define MAX_V_TILE (480/32)
 #define TA_OPAQUE_OBJECT_BUFFER_SIZE 128
 #define TA_TRANSPARENT_OBJECT_BUFFER_SIZE 128
 #define TA_PUNCHTHRU_OBJECT_BUFFER_SIZE 64
 #define TA_BACKGROUNDLIST_SIZE 256
-#define TA_CMDLIST_SIZE ((1 * 1024 * 1024) - TA_BACKGROUNDLIST_SIZE)
-#define TA_OBJLIST_SIZE (1 * 1024 * 1024)
+#define TA_CMDLIST_SIZE ((2 * 1024 * 1024) - TA_BACKGROUNDLIST_SIZE)
+#define TA_OBJLIST_SIZE (2 * 1024 * 1024)
 
 // Alignment required for various buffers.
 #define BUFFER_ALIGNMENT 32
@@ -425,7 +423,7 @@ void _ta_init_buffers()
 
     // Now, grab space for the tile descriptors themselves.
     ta_working_buffers.tile_descriptors = (void *)curbufloc;
-    curbufloc = ENSURE_ALIGNMENT(curbufloc + (4 * (6 * ((MAX_H_TILE * MAX_V_TILE) + 1))));
+    curbufloc = ENSURE_ALIGNMENT(curbufloc + (4 * (6 * (((global_video_width / 32) * (global_video_height / 32)) + 1))));
 
     if (curbufloc > ((UNCACHED_MIRROR | VRAM_BASE) + VRAM_SIZE))
     {
@@ -435,6 +433,11 @@ void _ta_init_buffers()
     // Now, the remaining space can be used for texture RAM.
     ta_working_buffers.texture_ram = (void *)((((curbufloc + 0xFFFFF) & 0xFFF00000) & VRAM_MASK) | UNCACHED_MIRROR | TEXRAM_BASE);
     ta_working_buffers.texture_ram_size = ((UNCACHED_MIRROR | TEXRAM_BASE) + TEXRAM_SIZE) - ((uint32_t)ta_working_buffers.texture_ram);
+
+    if (ta_working_buffers.texture_ram_size > TEXRAM_SIZE)
+    {
+        _irq_display_invariant("TA init failure", "allocated TEXRAM overflow!");
+    }
 
     // Clear the above memory so we don't get artifacts.
     if (hw_memset((void *)bufloc, 0, curbufloc - bufloc) == 0)
