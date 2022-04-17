@@ -43,13 +43,15 @@ typedef struct allocated_texture
 static allocated_texture_t *head = 0;
 static int initialized = 0;
 static mutex_t texalloc_mutex;
+static void *texture_base;
+static unsigned int texture_size;
 
 uint32_t _ta_texture_top()
 {
-    return (uint32_t)ta_texture_base() + ta_texture_size();
+    return (uint32_t)texture_base + texture_size;
 }
 
-void _ta_init_texture_allocator()
+void _ta_init_texture_allocator(void *base, unsigned int size)
 {
     // Allow for reinitialization if we change video modes.
     while (head != 0)
@@ -77,8 +79,12 @@ void _ta_init_texture_allocator()
     memset(head, 0, sizeof(allocated_texture_t));
 
     // Set up the location and size of the head chunk.
-    head->offset = (uint32_t)ta_texture_base();
-    head->size = ta_texture_size();
+    head->offset = (uint32_t)base;
+    head->size = size;
+
+    // Remember our init constants.
+    texture_base = base;
+    texture_size = size;
 }
 
 void *ta_texture_malloc(int uvsize, int bitsize)

@@ -388,7 +388,7 @@ extern uint32_t global_buffer_offset[3];
 #define ENSURE_ALIGNMENT(x) (((x) + (BUFFER_ALIGNMENT - 1)) & (~(BUFFER_ALIGNMENT - 1)))
 
 // Prototype from texture.c for managing textures in VRAM.
-void _ta_init_texture_allocator();
+void _ta_init_texture_allocator(void *base, unsigned int size);
 
 void _ta_init_buffers()
 {
@@ -433,8 +433,8 @@ void _ta_init_buffers()
     }
 
     // Now, the remaining space can be used for texture RAM.
-    ta_working_buffers.texture_ram = (void *)(UNCACHED_MIRROR | TEXRAM_BASE);
-    ta_working_buffers.texture_ram_size = global_buffer_offset[0];
+    ta_working_buffers.texture_ram = (void *)((((curbufloc + 0xFFFFF) & 0xFFF00000) & VRAM_MASK) | UNCACHED_MIRROR | TEXRAM_BASE);
+    ta_working_buffers.texture_ram_size = ((UNCACHED_MIRROR | TEXRAM_BASE) + TEXRAM_SIZE) - ((uint32_t)ta_working_buffers.texture_ram);
 
     // Clear the above memory so we don't get artifacts.
     if (hw_memset((void *)bufloc, 0, curbufloc - bufloc) == 0)
@@ -446,7 +446,7 @@ void _ta_init_buffers()
     _ta_set_background_color(&ta_working_buffers, ta_background_color);
 
     // Now, ask the texture allocator to initialize based on our known texture location.
-    _ta_init_texture_allocator();
+    _ta_init_texture_allocator(ta_working_buffers.texture_ram, ta_working_buffers.texture_ram_size);
 }
 
 void ta_commit_begin()

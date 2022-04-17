@@ -21,14 +21,6 @@
 #define min(a,b) (((a) < (b)) ? (a) : (b))
 #endif
 
-// We stick the VRAM area in the last 6 MB of texture RAM, with the TA-specific
-// VRAM setup directly after that. This leaves 11MB of space left for textures
-// themselves. The calculated size is based on three 640x480 buffers at 32BPP, plus
-// a 128kb space for scratch buffers, plus two 1MB sections for the TA's display
-// lists and stuff. This is about 5.5MB and the TA needs things aligned on a 1MB
-// boundary, so we round up to 5.
-#define GLOBAL_BUFFER_BASE_OFFSET (10 * (1024 * 1024))
-
 // The size of the VRAM scratch area that can be used by anyone, it is effectively
 // the 3rd double-buffer location.
 #define GLOBAL_BUFFER_SCRATCH_SIZE (1024 * 128)
@@ -272,7 +264,7 @@ void _video_init(int colordepth, int init_ta)
     global_video_depth = colordepth;
     global_background_color = 0;
     global_background_set = 0;
-    global_buffer_offset[0] = GLOBAL_BUFFER_BASE_OFFSET;
+    global_buffer_offset[0] = 0;
     global_buffer_offset[1] = global_buffer_offset[0] + (global_video_width * global_video_height * global_video_depth);
     global_buffer_offset[2] = global_buffer_offset[1] + (global_video_width * global_video_height * global_video_depth);
 
