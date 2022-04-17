@@ -1583,30 +1583,6 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
             }
             break;
         }
-        case 14:
-        {
-            // thread_notify_wait_ta_*.
-            thread_t *thread = (thread_t *)current->threadptr;
-            if (thread)
-            {
-                // Set the thread up to wake up on TA finished.
-                int waiting_irq = current->gp_regs[4];
-                if (waiting_irq >= 0 && waiting_irq < WAITING_TA_MAX)
-                {
-                    thread->waiting_irq[waiting_irq] = 0;
-                }
-                else
-                {
-                    _irq_display_exception(SIGABRT, current, "unrecognized IRQ wait value", waiting_irq);
-                }
-            }
-            else
-            {
-                // Should never happen.
-                _irq_display_exception(SIGABRT, current, "cannot locate thread object", which);
-            }
-            break;
-        }
         case 15:
         {
             // thread_wait_ta_*.
@@ -2373,28 +2349,50 @@ void thread_wait_hblank()
     asm("trapa #13" : : "r" (syscall_param0));
 }
 
+void _thread_notify_impl(int waiting_irq)
+{
+    uint32_t old_interrupts = irq_disable();
+    thread_t *thread = _thread_find_by_id(current_thread_id);
+
+    if (thread)
+    {
+        // Set the thread up to wake up on TA finished.
+        if (waiting_irq >= 0 && waiting_irq < WAITING_TA_MAX)
+        {
+            thread->waiting_irq[waiting_irq] = 0;
+        }
+        else
+        {
+            _irq_display_invariant("thread notify failure", "unrecognized IRQ wait value", waiting_irq);
+        }
+    }
+    else
+    {
+        // Should never happen.
+        _irq_display_invariant("thread notify failure", "cannot locate thread object", current_thread_id);
+    }
+
+    irq_restore(old_interrupts);
+}
+
 void thread_notify_wait_ta_render_finished()
 {
-    register uint32_t syscall_param0 asm("r4") = WAITING_TA_RENDER_FINISHED;
-    asm("trapa #14" : : "r" (syscall_param0));
+    _thread_notify_impl(WAITING_TA_RENDER_FINISHED);
 }
 
 void thread_notify_wait_ta_load_opaque()
 {
-    register uint32_t syscall_param0 asm("r4") = WAITING_TA_LOAD_OPAQUE_FINISHED;
-    asm("trapa #14" : : "r" (syscall_param0));
+    _thread_notify_impl(WAITING_TA_LOAD_OPAQUE_FINISHED);
 }
 
 void thread_notify_wait_ta_load_transparent()
 {
-    register uint32_t syscall_param0 asm("r4") = WAITING_TA_LOAD_TRANSPARENT_FINISHED;
-    asm("trapa #14" : : "r" (syscall_param0));
+    _thread_notify_impl(WAITING_TA_LOAD_TRANSPARENT_FINISHED);
 }
 
 void thread_notify_wait_ta_load_punchthru()
 {
-    register uint32_t syscall_param0 asm("r4") = WAITING_TA_LOAD_PUNCHTHRU_FINISHED;
-    asm("trapa #14" : : "r" (syscall_param0));
+    _thread_notify_impl(WAITING_TA_LOAD_PUNCHTHRU_FINISHED);
 }
 
 void thread_wait_ta_render_finished()

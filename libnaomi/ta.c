@@ -573,7 +573,7 @@ void _ta_begin_render(struct ta_buffers *buffers, void *scrn, float zclip)
     populated_lists = 0;
 }
 
-void ta_render_begin()
+void ta_render()
 {
     if (!_irq_is_disabled(_irq_get_sr()))
     {
@@ -583,10 +583,7 @@ void ta_render_begin()
 
     /* Start rendering the new command list to the screen */
     _ta_begin_render(&ta_working_buffers, buffer_base, BACKGROUND_Z_PLANE);
-}
 
-void ta_render_wait()
-{
     if (_irq_is_disabled(_irq_get_sr()))
     {
         /* Just spinloop waiting for the interrupt to happen. */
@@ -598,12 +595,6 @@ void ta_render_wait()
         /* Now, park the thread until the renderer is finished. */
         thread_wait_ta_render_finished();
     }
-}
-
-void ta_render()
-{
-    ta_render_begin();
-    ta_render_wait();
 }
 
 // Prototype for initializing texture twiddle tables in texture.c
