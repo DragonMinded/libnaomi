@@ -6,6 +6,9 @@
 #define AICA_RTC_SECS_L (*((volatile uint32_t *)0xa0710004))
 #define AICA_RTC_WREN (*((volatile uint32_t *)0xa0710008))
 
+// Prototypes for POSIX layer.
+void _posix_clear_gettimeofday();
+
 uint32_t rtc_get()
 {
     uint32_t val1;
@@ -39,5 +42,9 @@ void rtc_set(uint32_t newtime)
         val1 = ((AICA_RTC_SECS_H & 0xffff) << 16) | (AICA_RTC_SECS_L & 0xffff);
         val2 = ((AICA_RTC_SECS_H & 0xffff) << 16) | (AICA_RTC_SECS_L & 0xffff);
     } while (val1 != val2);
+
+    // Also make sure that gettimeofday() returns correctly.
+    _posix_clear_gettimeofday();
+
     irq_restore(old_interrupts);
 }

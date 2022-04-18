@@ -1322,10 +1322,28 @@ _CLOCK_T_ _times_r(struct _reent *reent, struct tms *tm)
 // like unix and C standard library expects.
 #define TWENTY_YEARS ((20 * 365LU + 5) * 86400)
 
+static uint32_t rtc_last_read = 0;
+static uint64_t profile_last_read = 0;
+
+void _posix_clear_gettimeofday()
+{
+    rtc_last_read = 0;
+    profile_last_read = 0;
+}
+
 int _gettimeofday_r(struct _reent *reent, struct timeval *tv, void *tz)
 {
-    tv->tv_sec = rtc_get() - TWENTY_YEARS;
-    tv->tv_usec = 0;
+    uint32_t old_irq = irq_disable();
+    if (rtc_last_read == 0)
+    {
+        rtc_last_read = rtc_get() - TWENTY_YEARS;
+        profile_last_read = _profile_get_current(0);
+    }
+    irq_restore(old_irq);
+
+    uint64_t now = _profile_get_current(0) - profile_last_read;
+    tv->tv_sec = (now / 1000000) + rtc_last_read;
+    tv->tv_usec = now % 1000000;
     return 0;
 }
 
