@@ -33,6 +33,8 @@ ARMCC += -mcpu=arm7
 ARMCC += -ffreestanding -fomit-frame-pointer -nostdlib -nostartfiles -fno-stack-protector
 # Make sure we compile optimized
 ARMCC += -O3
+# Make sure we warn about a bunch of stuff.
+ARMCC += -Wall
 # Include debugging information for addr2line.
 ARMCC += -g
 

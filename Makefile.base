@@ -42,6 +42,8 @@ ARMCC += -ffreestanding -fomit-frame-pointer -nostdlib -nostartfiles -fno-stack-
 ARMCC += -I${MAKEFILE_DIR}libnaomi/aica/
 # Make sure we compile optimized
 ARMCC += -O3
+# Make sure we error about a bunch of stuff.
+ARMCC += -Wall -Werror
 # Include debugging information for addr2line.
 ARMCC += -g
 

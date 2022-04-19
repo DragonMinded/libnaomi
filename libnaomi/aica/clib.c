@@ -3,7 +3,7 @@
 void * memset(void *ptr, int value, size_t num)
 {
     uint32_t location = (uint32_t)ptr;
-    uint32_t value32 = value & 0xFF | ((value << 8) & 0xFF00) | ((value << 16) & 0xFF0000) | ((value << 24) & 0xFF000000);
+    uint32_t value32 = (value & 0xFF) | ((value << 8) & 0xFF00) | ((value << 16) & 0xFF0000) | ((value << 24) & 0xFF000000);
 
     // Clear any prefixed misaligned bits.
     while ((num > 0) && (location & 0x3))
