@@ -1,0 +1,13 @@
+all: libtimidity.a
+
+SRCS += $(wildcard src/*.c)
+
+include ../../../../Makefile.base
+
+libtimidity.a: ${OBJS}
+	$(AR) -rcs -o $@ $^
+
+.PHONY: clean
+clean:
+	rm -rf build
+	rm -rf libtimidity.a

@@ -1,4 +1,4 @@
-all: zlib libbz2 libpng freetype libjpeg libxmp
+all: zlib libbz2 libpng freetype libjpeg libxmp libtimidity
 
 .PHONY: zlib
 zlib:
@@ -24,7 +24,11 @@ libjpeg:
 libxmp:
 	$(MAKE) -C libxmp
 
-install: install-zlib install-libbz2 install-libpng install-freetype install-libjpeg install-libxmp
+.PHONY: libtimidity
+libtimidity:
+	$(MAKE) -C libtimidity
+
+install: install-zlib install-libbz2 install-libpng install-freetype install-libjpeg install-libxmp install-libtimidity
 
 .PHONY: install-zlib
 install-zlib:
@@ -50,6 +54,10 @@ install-libjpeg:
 install-libxmp:
 	$(MAKE) -C libxmp install
 
+.PHONY: install-libtimidity
+install-libtimidity:
+	$(MAKE) -C libtimidity install
+
 .PHONY: clean
 clean:
 	$(MAKE) -C zlib clean
@@ -58,6 +66,7 @@ clean:
 	$(MAKE) -C freetype clean
 	$(MAKE) -C libjpeg clean
 	$(MAKE) -C libxmp clean
+	$(MAKE) -C libtimidity clean
 
 .PHONY: allclean
 allclean:
@@ -67,3 +76,4 @@ allclean:
 	$(MAKE) -C freetype allclean
 	$(MAKE) -C libjpeg allclean
 	$(MAKE) -C libxmp allclean
+	$(MAKE) -C libtimidity allclean
