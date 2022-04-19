@@ -2,8 +2,8 @@
 OPTIMIZATION_LEVEL ?= -O3
 
 # Set a default C standard and C++ standard.
-CSTD ?=
-CPPSTD ?=
+CSTD ?= gnu11
+CPPSTD ?= c++11
 
 # Little-endian SH-4.
 NAOMI_SH_CCFLAGS  = -ml
