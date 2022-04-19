@@ -12,7 +12,7 @@ tools pre-set.
 
 ## Building
 
-Out of the box, you can simply type `make`, assuming that you have followed the isntructions
+Out of the box, you can simply type `make`, assuming that you have followed the instructions
 for setting up libnaomi and have activated the toolchain environment. Subsequent builds with
 `make` will perform a recompile only of changed dependencies. Typing `make clean` will wipe
 the slate clean and force a full rebuild on the next invocation of `make`. All build
