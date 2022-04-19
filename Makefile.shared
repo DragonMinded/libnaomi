@@ -1,3 +1,86 @@
+# Set a default optimization level if the makefile didn't request one.
+OPTIMIZATION_LEVEL ?= -O3
+
+# Set a default C standard and C++ standard.
+CSTD ?=
+CPPSTD ?=
+
+# Little-endian SH-4.
+NAOMI_SH_CCFLAGS  = -ml
+# Don't use the system standard library (We supply our own newlib-one with -lc in the link step).
+NAOMI_SH_CCFLAGS += -nostdlib
+# Don't use the system start files (We supply our own crt0).
+NAOMI_SH_CCFLAGS += -nostartfiles
+# Don't use GCC stack protection (its not needed on a kernel-less system).
+NAOMI_SH_CCFLAGS += -fno-stack-protector
+# We're making a free-standing binary.
+NAOMI_SH_CCFLAGS += -ffreestanding
+# Don't generate code that uses a frame pointer.
+NAOMI_SH_CCFLAGS += -fomit-frame-pointer
+# Put every object in its own section so the linker can trim dead code.
+NAOMI_SH_CCFLAGS += -ffunction-sections -fdata-sections
+# Add libnaomi to include path.
+NAOMI_SH_CCFLAGS += ${NAOMI_SH_INCLUDEPATHS}
+# Make sure we compile optimized
+NAOMI_SH_CCFLAGS += ${OPTIMIZATION_LEVEL}
+# Make sure we warn about a bunch of stuff.
+NAOMI_SH_CCFLAGS += -Wall
+# Produce debug information so addr2line works.
+NAOMI_SH_CCFLAGS += -g
+# Add on C standard if present.
+NAOMI_SH_CCFLAGS += $(if $(CSTD), -std=$(CSTD),)
+
+# Set up gcc default options for compiling .c files.
+CC  = ${NAOMI_SH_CC} ${NAOMI_SH_CCFLAGS}
+
+# Little-endian SH-4.
+NAOMI_SH_CPPFLAGS  = -ml
+# Don't use the system standard library (We supply our own newlib-one with -lc in the link step).
+NAOMI_SH_CPPFLAGS += -nostdlib
+# Don't use the system start files (We supply our own crt0).
+NAOMI_SH_CPPFLAGS += -nostartfiles
+# Don't use GCC stack protection (its not needed on a kernel-less system).
+NAOMI_SH_CPPFLAGS += -fno-stack-protector
+# We're making a free-standing binary.
+NAOMI_SH_CPPFLAGS += -ffreestanding
+# Don't generate code that uses a frame pointer.
+NAOMI_SH_CPPFLAGS += -fomit-frame-pointer
+# Put every object in its own section so the linker can trim dead code.
+NAOMI_SH_CPPFLAGS += -ffunction-sections -fdata-sections
+# Add libnaomi to include path.
+NAOMI_SH_CPPFLAGS += ${NAOMI_SH_INCLUDEPATHS}
+# Make sure we compile optimized
+NAOMI_SH_CPPFLAGS += ${OPTIMIZATION_LEVEL}
+# Make sure we warn about a bunch of stuff.
+NAOMI_SH_CPPFLAGS += -Wall
+# Produce debug information so addr2line works.
+NAOMI_SH_CPPFLAGS += -g
+# Add on C++ standard if present.
+NAOMI_SH_CPPFLAGS += $(if $(CPPSTD), -std=$(CPPSTD),)
+
+# Set up gcc default options for compiling .cpp files.
+CPP  = ${NAOMI_SH_CPP} ${NAOMI_SH_CPPFLAGS}
+
+# Set up linker default options for linking the final elf file.
+LD  = ${NAOMI_SH_LD} ${NAOMI_SH_LDFLAGS}
+
+# Little endian SH-4
+NAOMI_SH_ASFLAGS  = --isa sh4 -little
+
+# Set up assembler default options for compiling .s files.
+AS  = ${NAOMI_SH_AS} ${NAOMI_SH_ASFLAGS}
+
+# Set up default options for objcopy, used for extracting the raw binary from the linked elf file.
+OBJCOPY = ${NAOMI_SH_OBJCOPY}
+
+# Set up default archiver, used for creating libraries.
+AR  = ${NAOMI_SH_AR}
+
+# Set up assembler default options for AICA .s files.
+ARMAS  = ${NAOMI_ARM_AS}
+# Make sure to specify the correct arch.
+ARMAS += -mcpu=arm7
+
 # Set up default options for objcopy, used for extracting the raw binary from the linked elf file.
 ARMOBJCOPY = ${NAOMI_ARM_OBJCOPY}
 
