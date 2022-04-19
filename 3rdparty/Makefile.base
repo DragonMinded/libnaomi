@@ -1,3 +1,11 @@
+# We don't want to force a non-default C or C++ implementation on 3rd party libs
+CSTD =
+CPPSTD =
+
+# We cannot control whether these libs have warnings or not.
+ENABLE_WALL = 0
+
+# Grab the same base that we use to compile libnaomi and the examples.
 include $(dir $(abspath $(lastword $(MAKEFILE_LIST))))../Makefile.base
 
 THIRD_PARTY_LIBS = -lnaomi ${BASELIBS} ${REQUIRED_LIBS}

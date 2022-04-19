@@ -60,3 +60,11 @@ ARMLD += -L${NAOMI_ARM_BASE}/arm-eabi/lib/ -L${NAOMI_ARM_BASE}/lib/gcc/arm-eabi/
 
 # Stuff we can share between the libnaomi makefile and the distributed one.
 include ${MAKEFILE_DIR}Makefile.shared
+
+# For our own C/C++ stuff, we want to enable -Werror as well as -Wall.
+ENABLE_WALL ?= 1
+
+ifeq ($(ENABLE_WALL), 1)
+NAOMI_SH_CCFLAGS += -Werror
+NAOMI_SH_CPPFLAGS += -Werror
+endif
