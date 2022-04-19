@@ -48,6 +48,7 @@ install: libnaomi libnaomimessage libnaomisprite wipe-install-venv
 	cp naomi.ld ${NAOMI_BASE}/tools
 	cp aica.ld ${NAOMI_BASE}/tools
 	cp Makefile.external.base ${NAOMI_BASE}/tools/Makefile.base
+	cp Makefile.shared ${NAOMI_BASE}/tools/Makefile.shared
 	cp tools/*.py tools/gdbserver tools/peekpoke tools/stdioredirect ${NAOMI_BASE}/tools
 
 .PHONY: clean
