@@ -83,12 +83,12 @@ The `CSTD` variable allows you to overwrite the default C standard. By default, 
 built code uses the `gnu11` standard. You might want to overwrite this to `c99` or something
 similar depending on the code you are porting and your preferences.
 
-## CPPSTD
+### CPPSTD
 
 The `CPPSTD` variable is identical to the `CSTD` variable, but it only gets passed into C++ when
 compiling C++ code. By default, libnaomi and all built code uses the `c++11 standard.
 
-## START_ADDR
+### START_ADDR
 
 The `START_ADDR` variable defines the actual memory location for the entrypoint of your code.
 This defaults to `0xc021000` and should not normally be changed. However, under certain circumstances
@@ -96,7 +96,7 @@ such as when compiling code that is meant to be hooked into commercial games cha
 be necessary. Note that changing this will change it everywhere including the macro definitions
 available to your code.
 
-## SERIAL
+### SERIAL
 
 The `SERIAL` variable defines the serial number for your actual game. This is defaulted to `B999`
 and must start with a `B` followed by two alphanumeric digits and finally a numeric digit. It must
@@ -104,7 +104,7 @@ be 4 digits, no more, no less. This will be used to set the ROM header as well a
 a macro definition in the code. It also gets used by the EEPROM subsystem to determine when to
 erase and set up defaults for the game's EEPROM.
 
-## BARE_METAL
+### BARE_METAL
 
 Define the `BARE_METAL` variable to 1 in order to build without libnaomi. This is useful when you
 need to build raw executable chunks that can be injected into games or used for overlay sections
