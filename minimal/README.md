@@ -86,7 +86,7 @@ similar depending on the code you are porting and your preferences.
 ### CPPSTD
 
 The `CPPSTD` variable is identical to the `CSTD` variable, but it only gets passed into C++ when
-compiling C++ code. By default, libnaomi and all built code uses the `c++11 standard.
+compiling C++ code. By default, libnaomi and all built code uses the `c++11` standard.
 
 ### START_ADDR
 
