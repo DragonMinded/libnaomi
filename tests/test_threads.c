@@ -234,7 +234,7 @@ void test_threads_sleep(test_context_t *context)
     thread_destroy(thread);
 
     ASSERT(time_spent > 250000, "Did not wait enough time (%lu) in thread!", time_spent);
-    ASSERT(time_spent < 251000, "Spent too much time (%lu) bookkeeping!", time_spent);
+    ASSERT(time_spent < 254000, "Spent too much time (%lu) bookkeeping!", time_spent);
 
     // Now test sleep.
     thread = thread_create("test", sleep_thread, 0);
@@ -245,7 +245,7 @@ void test_threads_sleep(test_context_t *context)
     thread_destroy(thread);
 
     ASSERT(time_spent > 250000, "Did not wait enough time (%lu) in thread!", time_spent);
-    ASSERT(time_spent < 251000, "Spent too much time (%lu) bookkeeping!", time_spent);
+    ASSERT(time_spent < 254000, "Spent too much time (%lu) bookkeeping!", time_spent);
 }
 
 typedef struct

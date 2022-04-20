@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #define MICROSECONDS_IN_ONE_SECOND 1000000
-#define PREEMPTION_HZ 1000
+#define PREEMPTION_HZ 100
 
 // Should match up with save and restore code in sh-crt0.s.
 typedef struct
