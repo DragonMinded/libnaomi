@@ -53,11 +53,6 @@ static int response_pos = 0;
 
 #define TAB_WIDTH 4
 
-#define move_buffer() \
-    memmove(render_buffer, render_buffer + console_width, (console_width * (console_height - 1))); \
-    memmove(render_attrs, render_attrs + console_width, sizeof(render_attrs[0]) * (console_width * (console_height - 1))); \
-    pos -= console_width;
-
 static void __write_response( const char * const resp, unsigned int len )
 {
     // Note, this expects interrupts to be disabled by the calling function to be
@@ -93,7 +88,14 @@ static int __console_write( const char * const buf, unsigned int len )
         if(pos == console_width * console_height)
         {
             /* Need to scroll the buffer */
-            move_buffer();
+            memmove(render_buffer, render_buffer + console_width, (console_width * (console_height - 1)));
+            memmove(render_attrs, render_attrs + console_width, sizeof(render_attrs[0]) * (console_width * (console_height - 1)));
+            pos -= console_width;
+
+            /* Need to wipe the contents at this location. No need to adjust render attrs since they
+             * will be overwritten when we write into these locations. We just want to make sure that
+             * the previous line doesn't get displayed until we overwrite it. */
+            memset(render_buffer + pos, 0, console_width);
         }
 
         if (cur_escape_flags & ESCAPE_FLAGS_PROCESSING)
@@ -738,6 +740,8 @@ color_t attr_to_color(uint8_t attr)
 
 void console_render()
 {
+    uint32_t old_irq = irq_disable();
+
     if (render_buffer && render_attrs && console_visible)
     {
         /* Ensure data is flushed before rendering */
@@ -797,6 +801,8 @@ void console_render()
             }
         }
     }
+
+    irq_restore(old_irq);
 }
 
 void console_set_visible(unsigned int visibility)
