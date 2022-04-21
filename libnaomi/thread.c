@@ -265,7 +265,13 @@ global_counter_t *_global_counter_find(uint32_t counterid)
 
 void * _idle_thread(void *param)
 {
-    while ( 1 ) { thread_yield(); }
+    // Do nothing, forever. We used to yield here, but if we are running the
+    // idle thread, then every other thread is parked on something, presumably
+    // for hardware resources or interrupts. Otherwise, there would be at least
+    // one thread to run. So, don't yield because it will cause unnecessary
+    // thrashing into and out of the kernel. Instead, wait for that interrupt
+    // to happen and we will be preempted.
+    while ( 1 ) { ; }
 
     return 0;
 }
