@@ -103,12 +103,15 @@ void _romfs_init();
 void _romfs_free();
 void _posix_init();
 void _posix_free();
+void _audio_init();
+void _audio_free();
 
 void _startup()
 {
     // Initialize things we promise are fully ready by the time main/test is called.
     _timer_init();
     _thread_init();
+    _audio_init();
     _maple_init();
     _irq_init();
     _posix_init();
@@ -146,6 +149,7 @@ void _shutdown()
     _posix_free();
     _irq_free();
     _maple_free();
+    _audio_free();
     _thread_free();
     _timer_free();
 }

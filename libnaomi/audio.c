@@ -2,6 +2,7 @@
 #include <math.h>
 #include "naomi/audio.h"
 #include "naomi/system.h"
+#include "naomi/thread.h"
 #include "aica/common.h"
 #include "irqinternal.h"
 
@@ -37,6 +38,9 @@ static int ringformat = 0;
 static int ringsize = 0;
 static int ringleftpos = 0;
 static int ringrightpos = 0;
+
+// Global hardware access mutexes.
+static mutex_t g2bus_mutex;
 
 // Safety value for leaving a chunk after the current playback pos alone.
 #define RINGBUFFER_SAFETY_SIZE 512
@@ -89,6 +93,9 @@ void load_aica_binary(void *binary, unsigned int length)
     // of 4. Any other configuration asks for undefined behavior.
     volatile unsigned int *aicabase = (volatile unsigned int *)AICA_BASE;
 
+    // First, lock the bus so that we don't compete with other threads.
+    mutex_lock(&g2bus_mutex);
+
     // Set up 16-bit wave memory size.
     aicabase[AICA_VERSION] = 0x200;
 
@@ -101,15 +108,22 @@ void load_aica_binary(void *binary, unsigned int length)
 
     // Pull the AICA MCU back out of reset.
     aicabase[AICA_RESET] &= ~0x1;
+    mutex_unlock(&g2bus_mutex);
 }
 
 uint32_t audio_aica_uptime()
 {
+    // First, lock the bus so that we don't compete with other threads.
+    mutex_lock(&g2bus_mutex);
+
     // Make sure we have room in the FIFO to read the uptime.
     __aica_fifo_wait();
 
     // Return the uptime in milliseconds as written by the AICA binary.
-    return AICA_CMD_BUFFER(CMD_BUFFER_UPTIME);
+    uint32_t response = AICA_CMD_BUFFER(CMD_BUFFER_UPTIME);
+    mutex_unlock(&g2bus_mutex);
+
+    return response;
 }
 
 uint32_t __audio_exchange_command(uint32_t command, uint32_t param1, uint32_t param2, uint32_t param3, uint32_t param4)
@@ -144,6 +158,16 @@ uint32_t __audio_exchange_command(uint32_t command, uint32_t param1, uint32_t pa
 
     // Return the response.
     return AICA_CMD_BUFFER(CMD_BUFFER_RESPONSE);
+}
+
+void _audio_init()
+{
+    mutex_init(&g2bus_mutex);
+}
+
+void _audio_free()
+{
+    mutex_free(&g2bus_mutex);
 }
 
 void audio_init()
@@ -222,6 +246,9 @@ uint32_t __audio_load_location(int format, unsigned int samplerate, void *data, 
 
 int audio_play_sound(int format, unsigned int samplerate, uint32_t speakers, float volume, void *data, unsigned int num_samples)
 {
+    // First, lock the bus so that we don't compete with other threads.
+    mutex_lock(&g2bus_mutex);
+
     uint32_t location = __audio_load_location(format, samplerate, data, num_samples);
     if (location != 0)
     {
@@ -238,28 +265,38 @@ int audio_play_sound(int format, unsigned int samplerate, uint32_t speakers, flo
 
         if (__audio_exchange_command(REQUEST_DISCARD_AFTER_USE, location, 0, 0, 0) != RESPONSE_SUCCESS)
         {
+            mutex_unlock(&g2bus_mutex);
             return -1;
         }
 
         // Now, play the track.
-        return __audio_exchange_command(REQUEST_START_PLAY, location, panning, loudness, 0) == RESPONSE_SUCCESS ? 0 : -1;
+        int response = __audio_exchange_command(REQUEST_START_PLAY, location, panning, loudness, 0) == RESPONSE_SUCCESS ? 0 : -1;
+
+        mutex_unlock(&g2bus_mutex);
+        return response;
     }
     else
     {
+        mutex_unlock(&g2bus_mutex);
         return -1;
     }
 }
 
 int audio_register_sound(int format, unsigned int samplerate, void *data, unsigned int num_samples)
 {
+    // First, lock the bus so that we don't compete with other threads.
+    mutex_lock(&g2bus_mutex);
+
     uint32_t location = __audio_load_location(format, samplerate, data, num_samples);
 
     if (location)
     {
+        mutex_unlock(&g2bus_mutex);
         return location;
     }
     else
     {
+        mutex_unlock(&g2bus_mutex);
         return -1;
     }
 }
@@ -268,7 +305,9 @@ void audio_unregister_sound(int sound)
 {
     if (sound > 0)
     {
+        mutex_lock(&g2bus_mutex);
         __audio_exchange_command(REQUEST_FREE, sound, 0, 0, 0);
+        mutex_unlock(&g2bus_mutex);
     }
 }
 
@@ -276,7 +315,11 @@ int audio_set_registered_sound_loop(int sound, unsigned int loop_point)
 {
     if (sound > 0)
     {
-        return __audio_exchange_command(REQUEST_SET_LOOP_POINT, sound, loop_point, 0, 0);
+        mutex_lock(&g2bus_mutex);
+        int retval = __audio_exchange_command(REQUEST_SET_LOOP_POINT, sound, loop_point, 0, 0);
+        mutex_unlock(&g2bus_mutex);
+
+        return retval;
     }
     else
     {
@@ -288,7 +331,11 @@ int audio_clear_registered_sound_loop(int sound)
 {
     if (sound > 0)
     {
-        return __audio_exchange_command(REQUEST_CLEAR_LOOP_POINT, sound, 0, 0, 0);
+        mutex_lock(&g2bus_mutex);
+        int retval = __audio_exchange_command(REQUEST_CLEAR_LOOP_POINT, sound, 0, 0, 0);
+        mutex_unlock(&g2bus_mutex);
+
+        return retval;
     }
     else
     {
@@ -311,7 +358,11 @@ int audio_play_registered_sound(int sound, uint32_t speakers, float volume)
         }
         uint32_t loudness = __audio_volume_to_loudness(volume);
 
-        return __audio_exchange_command(REQUEST_START_PLAY, sound, panning, loudness, 0) == RESPONSE_SUCCESS ? 0 : -1;
+        mutex_lock(&g2bus_mutex);
+        int retval = __audio_exchange_command(REQUEST_START_PLAY, sound, panning, loudness, 0) == RESPONSE_SUCCESS ? 0 : -1;
+        mutex_unlock(&g2bus_mutex);
+
+        return retval;
     }
     else
     {
@@ -323,7 +374,11 @@ int audio_stop_registered_sound(int sound)
 {
     if (sound > 0)
     {
-        return __audio_exchange_command(REQUEST_STOP_PLAY, sound, 0, 0, 0);
+        mutex_lock(&g2bus_mutex);
+        int retval = __audio_exchange_command(REQUEST_STOP_PLAY, sound, 0, 0, 0);
+        mutex_unlock(&g2bus_mutex);
+
+        return retval;
     }
     else
     {
@@ -335,7 +390,10 @@ void audio_unregister_ringbuffer()
 {
     if (leftchannel || rightchannel)
     {
+        mutex_lock(&g2bus_mutex);
         __audio_exchange_command(REQUEST_STOP_STEREO_RINGBUFFER, 0, 0, 0, 0);
+        mutex_unlock(&g2bus_mutex);
+
         leftchannel = 0;
         rightchannel = 0;
         ringformat = 0;
@@ -380,6 +438,7 @@ int audio_register_ringbuffer(int format, unsigned int samplerate, unsigned int 
     }
 
     // Now request a new stereo ringbuffer.
+    mutex_lock(&g2bus_mutex);
     int retval = __audio_exchange_command(
         REQUEST_START_STEREO_RINGBUFFER,
         num_samples,
@@ -390,6 +449,7 @@ int audio_register_ringbuffer(int format, unsigned int samplerate, unsigned int 
 
     if (retval == RESPONSE_FAILURE)
     {
+        mutex_unlock(&g2bus_mutex);
         return -1;
     }
 
@@ -399,8 +459,12 @@ int audio_register_ringbuffer(int format, unsigned int samplerate, unsigned int 
     if (leftchannel == 0 || rightchannel == 0)
     {
         __audio_exchange_command(REQUEST_STOP_STEREO_RINGBUFFER, 0, 0, 0, 0);
+        mutex_unlock(&g2bus_mutex);
         return -1;
     }
+
+    // No longer need the hardware
+    mutex_unlock(&g2bus_mutex);
 
     // Set up parameters for ringbuffer writing.
     ringformat = format;
@@ -425,6 +489,9 @@ int audio_write_stereo_data(void *data, unsigned int num_samples)
         // We're not initialized!
         return -1;
     }
+
+    // Make sure we don't compete with other threads.
+    mutex_lock(&g2bus_mutex);
 
     // First, we need to get the current playback position for this channel.
     int leftreadposition = 0;
@@ -597,6 +664,7 @@ int audio_write_stereo_data(void *data, unsigned int num_samples)
 
     ringleftpos = leftwriteposition;
     ringrightpos = rightwriteposition;
+    mutex_unlock(&g2bus_mutex);
 
     return actual_samples;
 }
@@ -608,6 +676,9 @@ int audio_write_mono_data(int channel, void *data, unsigned int num_samples)
         // We're not initialized!
         return -1;
     }
+
+    // Make sure we don't compete with other threads.
+    mutex_lock(&g2bus_mutex);
 
     // First, we need to get the current playback position for this channel.
     int readposition = 0;
@@ -634,6 +705,7 @@ int audio_write_mono_data(int channel, void *data, unsigned int num_samples)
     else
     {
         // This isn't a valid channel.
+        mutex_unlock(&g2bus_mutex);
         return -1;
     }
 
@@ -730,5 +802,6 @@ int audio_write_mono_data(int channel, void *data, unsigned int num_samples)
         rightaccumamount = accumamount;
     }
 
+    mutex_unlock(&g2bus_mutex);
     return actual_samples;
 }

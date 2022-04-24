@@ -13,10 +13,8 @@ extern unsigned int aica_bin_len;
 #define AICA_DEFAULT_BINARY aica_bin_data
 #define AICA_DEFAULT_BINARY_SIZE aica_bin_len
 
-// This interface is intentionally not thread-safe. If more than one thread
-// attempts to load a new binary at once it is indeterminate which one will
-// be loaded on the AICA. It is recommended not to interact with the AICA
-// across multiple threads.
+// This interface is thread-safe, but it is not recommended to attempt to load two
+// binaries at once, because only the last one loaded will remain on the AICA.
 void load_aica_binary(void *binary, unsigned int length);
 
 // Initialize and free the default audio interface which allows you to use all

@@ -482,70 +482,68 @@ int maple_request_update(void *binary, unsigned int len)
  */
 int maple_request_eeprom_read(uint8_t *outbytes)
 {
-    if (mutex_try_lock(&maple_mutex))
+    // First, lock the bus so that the audio subsystem doesn't cause holly errors.
+    mutex_lock(&maple_mutex);
+
+    // The maple bus could be fetching JVS replies from another request.
+    _maple_wait_for_ready();
+
+    uint8_t req_subcommand[4] = {
+        0x01,         // Subcommand 0x01, read whole EEPROM to MIE.
+        0x00,
+        0x00,
+        0x00,
+    };
+
+    uint32_t *resp = _maple_swap_data(0, 0, MAPLE_NAOMI_IO_REQUEST, 1, req_subcommand);
+    if(_maple_response_code(resp) != MAPLE_NAOMI_IO_RESPONSE)
     {
-        // The maple bus could be fetching JVS replies from another request.
-        _maple_wait_for_ready();
-
-        uint8_t req_subcommand[4] = {
-            0x01,         // Subcommand 0x01, read whole EEPROM to MIE.
-            0x00,
-            0x00,
-            0x00,
-        };
-
-        uint32_t *resp = _maple_swap_data(0, 0, MAPLE_NAOMI_IO_REQUEST, 1, req_subcommand);
-        if(_maple_response_code(resp) != MAPLE_NAOMI_IO_RESPONSE)
-        {
-            // Invalid response packet
-            mutex_unlock(&maple_mutex);
-            return -1;
-        }
-        if(_maple_response_payload_length_words(resp) < 1)
-        {
-            // Invalid payload length. We would check against exactly 1 word, but
-            // it looks like sometimes the MIE responds with 2 words.
-            mutex_unlock(&maple_mutex);
-            return -1;
-        }
-        if(resp[1] != 0x02)
-        {
-            // Invalid subcommand response
-            mutex_unlock(&maple_mutex);
-            return -1;
-        }
-
-        // Now, wait until the EEPROM is read to fetch it.
-        _maple_wait_for_ready();
-
-        uint8_t fetch_subcommand[4] = {
-            0x03,         // Subcommand 0x03, read EEPROM result.
-            0x00,
-            0x00,
-            0x00,
-        };
-
-        resp = _maple_swap_data(0, 0, MAPLE_NAOMI_IO_REQUEST, 1, fetch_subcommand);
-        if(_maple_response_code(resp) != MAPLE_NAOMI_IO_RESPONSE)
-        {
-            // Invalid response packet
-            mutex_unlock(&maple_mutex);
-            return -1;
-        }
-        if(_maple_response_payload_length_words(resp) != 32)
-        {
-            // Invalid payload length
-            mutex_unlock(&maple_mutex);
-            return -1;
-        }
-
-        // Copy the data out, we did it!
-        memcpy(outbytes, &resp[1], 128);
+        // Invalid response packet
         mutex_unlock(&maple_mutex);
-        return 0;
+        return -1;
+    }
+    if(_maple_response_payload_length_words(resp) < 1)
+    {
+        // Invalid payload length. We would check against exactly 1 word, but
+        // it looks like sometimes the MIE responds with 2 words.
+        mutex_unlock(&maple_mutex);
+        return -1;
+    }
+    if(resp[1] != 0x02)
+    {
+        // Invalid subcommand response
+        mutex_unlock(&maple_mutex);
+        return -1;
     }
 
-    return -1;
+    // Now, wait until the EEPROM is read to fetch it.
+    _maple_wait_for_ready();
+
+    uint8_t fetch_subcommand[4] = {
+        0x03,         // Subcommand 0x03, read EEPROM result.
+        0x00,
+        0x00,
+        0x00,
+    };
+
+    resp = _maple_swap_data(0, 0, MAPLE_NAOMI_IO_REQUEST, 1, fetch_subcommand);
+    if(_maple_response_code(resp) != MAPLE_NAOMI_IO_RESPONSE)
+    {
+        // Invalid response packet
+        mutex_unlock(&maple_mutex);
+        return -1;
+    }
+    if(_maple_response_payload_length_words(resp) != 32)
+    {
+        // Invalid payload length
+        mutex_unlock(&maple_mutex);
+        return -1;
+    }
+
+    // Copy the data out, we did it!
+    memcpy(outbytes, &resp[1], 128);
+    mutex_unlock(&maple_mutex);
+    return 0;
 }
 
 /**
@@ -556,40 +554,38 @@ int maple_request_eeprom_read(uint8_t *outbytes)
  */
 int maple_request_eeprom_write(uint8_t *inbytes)
 {
-    if (mutex_try_lock(&maple_mutex))
+    // First, lock the bus so that the audio subsystem doesn't cause holly errors.
+    mutex_lock(&maple_mutex);
+
+    // The maple bus could be fetching JVS replies from another request.
+    _maple_wait_for_ready();
+
+    for(unsigned int i = 0; i < 0x80; i += 0x10)
     {
-        // The maple bus could be fetching JVS replies from another request.
-        _maple_wait_for_ready();
+        // First, craft the subcommand requesting an EEPROM chunk write.
+        uint8_t req_subcommand[20];
+        req_subcommand[0] = 0x0B;      // Subcommand 0x0B, write chunk of EEPROM.
+        req_subcommand[1] = i & 0xFF;  // Write offset, relative to start of EEPROM.
+        req_subcommand[2] = 0x10;      // Chunk size, always 0x10 in practice.
+        req_subcommand[3] = 0x00;
+        memcpy(&req_subcommand[4], &inbytes[i], 0x10);
 
-        for(unsigned int i = 0; i < 0x80; i += 0x10)
+        // Now, send it, verifying that it acknowledged the data
+        uint32_t *resp = _maple_swap_data(0, 0, MAPLE_NAOMI_IO_REQUEST, 5, req_subcommand);
+        if(_maple_response_code(resp) != MAPLE_NAOMI_IO_RESPONSE)
         {
-            // First, craft the subcommand requesting an EEPROM chunk write.
-            uint8_t req_subcommand[20];
-            req_subcommand[0] = 0x0B;      // Subcommand 0x0B, write chunk of EEPROM.
-            req_subcommand[1] = i & 0xFF;  // Write offset, relative to start of EEPROM.
-            req_subcommand[2] = 0x10;      // Chunk size, always 0x10 in practice.
-            req_subcommand[3] = 0x00;
-            memcpy(&req_subcommand[4], &inbytes[i], 0x10);
-
-            // Now, send it, verifying that it acknowledged the data
-            uint32_t *resp = _maple_swap_data(0, 0, MAPLE_NAOMI_IO_REQUEST, 5, req_subcommand);
-            if(_maple_response_code(resp) != MAPLE_NAOMI_IO_RESPONSE)
-            {
-                // Invalid response packet
-                mutex_unlock(&maple_mutex);
-                return -1;
-            }
-
-            // Now, wait for the write operation to finish.
-            _maple_wait_for_ready();
+            // Invalid response packet
+            mutex_unlock(&maple_mutex);
+            return -1;
         }
 
-        // Succeeded in writing new EEPROM!
-        mutex_unlock(&maple_mutex);
-        return 0;
+        // Now, wait for the write operation to finish.
+        _maple_wait_for_ready();
     }
 
-    return -1;
+    // Succeeded in writing new EEPROM!
+    mutex_unlock(&maple_mutex);
+    return 0;
 }
 
 /**
@@ -841,100 +837,98 @@ int __maple_request_jvs_send_buttons_packet(uint8_t addr, unsigned int unknown)
  */
 int maple_request_jvs_buttons(uint8_t addr, jvs_buttons_t *buttons)
 {
-    if (mutex_try_lock(&maple_mutex))
+    // First, lock the bus so that the audio subsystem doesn't cause holly errors.
+    mutex_lock(&maple_mutex);
+
+    if (!__outstanding_request || __outstanding_request_addr != addr)
     {
-        if (!__outstanding_request || __outstanding_request_addr != addr)
+        if(!__maple_request_jvs_send_buttons_packet(addr, 1))
         {
-            if(!__maple_request_jvs_send_buttons_packet(addr, 1))
-            {
-                // Didn't get a valid response for sending JVS.
-                mutex_unlock(&maple_mutex);
-                return -1;
-            }
-        }
-
-        jvs_status_t status = _maple_request_recv_jvs();
-        if(!status.packet_length)
-        {
-            // Didn't get a packet
+            // Didn't get a valid response for sending JVS.
             mutex_unlock(&maple_mutex);
             return -1;
         }
-
-        if(!_jvs_packet_valid(status.packet))
-        {
-            // Packet failed CRC
-            mutex_unlock(&maple_mutex);
-            return -1;
-        }
-
-        if(_jvs_packet_code(status.packet) != 0x01)
-        {
-            // Packet is not response type.
-            mutex_unlock(&maple_mutex);
-            return -1;
-        }
-        if(_jvs_packet_payload(status.packet)[0] != 0x01)
-        {
-            // Packet is not report type.
-            mutex_unlock(&maple_mutex);
-            return -1;
-        }
-
-        // Parse out the buttons
-        uint8_t *payload = _jvs_packet_payload(status.packet) + 1;
-        buttons->dip1 = status.dip_switches & 0x1;
-        buttons->dip2 = (status.dip_switches >> 1) & 0x1;
-        buttons->dip3 = (status.dip_switches >> 2) & 0x1;
-        buttons->dip4 = (status.dip_switches >> 3) & 0x1;
-        buttons->psw1 = status.psw1;
-        buttons->psw2 = status.psw2;
-        buttons->test = (payload[0] >> 7) & 0x1;
-
-        // Player 1 controls
-        buttons->player1.service = (payload[1] >> 6) & 0x1;
-        buttons->player1.start = (payload[1] >> 7) & 0x1;
-        buttons->player1.up = (payload[1] >> 5) & 0x1;
-        buttons->player1.down = (payload[1] >> 4) & 0x1;
-        buttons->player1.left = (payload[1] >> 3) & 0x1;
-        buttons->player1.right = (payload[1] >> 2) & 0x1;
-        buttons->player1.button1 = (payload[1] >> 1) & 0x1;
-        buttons->player1.button2 = payload[1] & 0x1;
-        buttons->player1.button3 = (payload[2] >> 7) & 0x1;
-        buttons->player1.button4 = (payload[2] >> 6) & 0x1;
-        buttons->player1.button5 = (payload[2] >> 5) & 0x1;
-        buttons->player1.button6 = (payload[2] >> 4) & 0x1;
-        buttons->player1.analog1 = payload[11];
-        buttons->player1.analog2 = payload[13];
-        buttons->player1.analog3 = payload[15];
-        buttons->player1.analog4 = payload[17];
-
-        // Player 2 controls
-        buttons->player2.service = (payload[3] >> 6) & 0x1;
-        buttons->player2.start = (payload[3] >> 7) & 0x1;
-        buttons->player2.up = (payload[3] >> 5) & 0x1;
-        buttons->player2.down = (payload[3] >> 4) & 0x1;
-        buttons->player2.left = (payload[3] >> 3) & 0x1;
-        buttons->player2.right = (payload[3] >> 2) & 0x1;
-        buttons->player2.button1 = (payload[3] >> 1) & 0x1;
-        buttons->player2.button2 = payload[3] & 0x1;
-        buttons->player2.button3 = (payload[4] >> 7) & 0x1;
-        buttons->player2.button4 = (payload[4] >> 6) & 0x1;
-        buttons->player2.button5 = (payload[4] >> 5) & 0x1;
-        buttons->player2.button6 = (payload[4] >> 4) & 0x1;
-        buttons->player2.analog1 = payload[19];
-        buttons->player2.analog2 = payload[21];
-        buttons->player2.analog3 = payload[23];
-        buttons->player2.analog4 = payload[25];
-
-        // Finally, send another request to be ready next time we poll.
-        __outstanding_request = __maple_request_jvs_send_buttons_packet(addr, 1);
-        __outstanding_request_addr = addr;
-        mutex_unlock(&maple_mutex);
-        return 0;
     }
 
-    return -1;
+    jvs_status_t status = _maple_request_recv_jvs();
+    if(!status.packet_length)
+    {
+        // Didn't get a packet
+        mutex_unlock(&maple_mutex);
+        return -1;
+    }
+
+    if(!_jvs_packet_valid(status.packet))
+    {
+        // Packet failed CRC
+        mutex_unlock(&maple_mutex);
+        return -1;
+    }
+
+    if(_jvs_packet_code(status.packet) != 0x01)
+    {
+        // Packet is not response type.
+        mutex_unlock(&maple_mutex);
+        return -1;
+    }
+    if(_jvs_packet_payload(status.packet)[0] != 0x01)
+    {
+        // Packet is not report type.
+        mutex_unlock(&maple_mutex);
+        return -1;
+    }
+
+    // Parse out the buttons
+    uint8_t *payload = _jvs_packet_payload(status.packet) + 1;
+    buttons->dip1 = status.dip_switches & 0x1;
+    buttons->dip2 = (status.dip_switches >> 1) & 0x1;
+    buttons->dip3 = (status.dip_switches >> 2) & 0x1;
+    buttons->dip4 = (status.dip_switches >> 3) & 0x1;
+    buttons->psw1 = status.psw1;
+    buttons->psw2 = status.psw2;
+    buttons->test = (payload[0] >> 7) & 0x1;
+
+    // Player 1 controls
+    buttons->player1.service = (payload[1] >> 6) & 0x1;
+    buttons->player1.start = (payload[1] >> 7) & 0x1;
+    buttons->player1.up = (payload[1] >> 5) & 0x1;
+    buttons->player1.down = (payload[1] >> 4) & 0x1;
+    buttons->player1.left = (payload[1] >> 3) & 0x1;
+    buttons->player1.right = (payload[1] >> 2) & 0x1;
+    buttons->player1.button1 = (payload[1] >> 1) & 0x1;
+    buttons->player1.button2 = payload[1] & 0x1;
+    buttons->player1.button3 = (payload[2] >> 7) & 0x1;
+    buttons->player1.button4 = (payload[2] >> 6) & 0x1;
+    buttons->player1.button5 = (payload[2] >> 5) & 0x1;
+    buttons->player1.button6 = (payload[2] >> 4) & 0x1;
+    buttons->player1.analog1 = payload[11];
+    buttons->player1.analog2 = payload[13];
+    buttons->player1.analog3 = payload[15];
+    buttons->player1.analog4 = payload[17];
+
+    // Player 2 controls
+    buttons->player2.service = (payload[3] >> 6) & 0x1;
+    buttons->player2.start = (payload[3] >> 7) & 0x1;
+    buttons->player2.up = (payload[3] >> 5) & 0x1;
+    buttons->player2.down = (payload[3] >> 4) & 0x1;
+    buttons->player2.left = (payload[3] >> 3) & 0x1;
+    buttons->player2.right = (payload[3] >> 2) & 0x1;
+    buttons->player2.button1 = (payload[3] >> 1) & 0x1;
+    buttons->player2.button2 = payload[3] & 0x1;
+    buttons->player2.button3 = (payload[4] >> 7) & 0x1;
+    buttons->player2.button4 = (payload[4] >> 6) & 0x1;
+    buttons->player2.button5 = (payload[4] >> 5) & 0x1;
+    buttons->player2.button6 = (payload[4] >> 4) & 0x1;
+    buttons->player2.analog1 = payload[19];
+    buttons->player2.analog2 = payload[21];
+    buttons->player2.analog3 = payload[23];
+    buttons->player2.analog4 = payload[25];
+
+    // Finally, send another request to be ready next time we poll.
+    __outstanding_request = __maple_request_jvs_send_buttons_packet(addr, 1);
+    __outstanding_request_addr = addr;
+    mutex_unlock(&maple_mutex);
+    return 0;
 }
 
 int maple_poll_buttons()
