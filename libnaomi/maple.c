@@ -942,6 +942,7 @@ int maple_poll_buttons()
     jvs_buttons_t new_buttons;
     if (maple_request_jvs_buttons(0x01, &new_buttons) == 0)
     {
+        uint32_t old_irq = irq_disable();
         if (first_poll)
         {
             // We already polled at least once, so copy what we have to
@@ -961,6 +962,7 @@ int maple_poll_buttons()
             last_buttons = cur_buttons;
             first_poll = 1;
         }
+        irq_restore(old_irq);
 
         return 0;
     }
@@ -971,7 +973,10 @@ int maple_poll_buttons()
 jvs_buttons_t maple_buttons_held()
 {
     // Just return the state of all buttons currently.
-    return cur_buttons;
+    uint32_t old_irq = irq_disable();
+    jvs_buttons_t buttons = cur_buttons;
+    irq_restore(old_irq);
+    return buttons;
 }
 
 uint8_t __press(uint8_t old, uint8_t new)
@@ -988,6 +993,7 @@ jvs_buttons_t maple_buttons_pressed()
 {
     jvs_buttons_t buttons;
 
+    uint32_t old_irq = irq_disable();
     buttons.dip1 = __press(last_buttons.dip1, cur_buttons.dip1);
     buttons.dip2 = __press(last_buttons.dip2, cur_buttons.dip2);
     buttons.dip3 = __press(last_buttons.dip3, cur_buttons.dip3);
@@ -1023,6 +1029,7 @@ jvs_buttons_t maple_buttons_pressed()
     buttons.player2.button4 = __press(last_buttons.player2.button4, cur_buttons.player2.button4);
     buttons.player2.button5 = __press(last_buttons.player2.button5, cur_buttons.player2.button5);
     buttons.player2.button6 = __press(last_buttons.player2.button6, cur_buttons.player2.button6);
+    irq_restore(old_irq);
 
     return buttons;
 }
@@ -1031,6 +1038,7 @@ jvs_buttons_t maple_buttons_released()
 {
     jvs_buttons_t buttons;
 
+    uint32_t old_irq = irq_disable();
     buttons.dip1 = __release(last_buttons.dip1, cur_buttons.dip1);
     buttons.dip2 = __release(last_buttons.dip2, cur_buttons.dip2);
     buttons.dip3 = __release(last_buttons.dip3, cur_buttons.dip3);
@@ -1066,6 +1074,7 @@ jvs_buttons_t maple_buttons_released()
     buttons.player2.button4 = __release(last_buttons.player2.button4, cur_buttons.player2.button4);
     buttons.player2.button5 = __release(last_buttons.player2.button5, cur_buttons.player2.button5);
     buttons.player2.button6 = __release(last_buttons.player2.button6, cur_buttons.player2.button6);
+    irq_restore(old_irq);
 
     return buttons;
 }
