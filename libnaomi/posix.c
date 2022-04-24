@@ -38,6 +38,9 @@ pthread_once_t destructor_once = PTHREAD_ONCE_INIT;
 void _fs_init();
 void _fs_free();
 
+/* Forward definition for memory validation function. */
+extern int _valid_memory_range(void *addr);
+
 void _posix_init()
 {
     mutex_init(&stdio_mutex);
@@ -193,8 +196,12 @@ void _fs_free()
     // Go through and close all open file handles for all filesystems.
     for (int j = 0; j < MAX_OPEN_FILES; j++)
     {
-        if (handles[j].fileno > 0 && handles[j].handle != 0)
-        {
+        if (
+            handles[j].fileno > 0 &&
+            handles[j].handle != 0 &&
+            _valid_memory_range(filesystems[handles[j].fs_mapping].fs) &&
+            _valid_memory_range(filesystems[handles[j].fs_mapping].fs->close)
+        ) {
             filesystems[handles[j].fs_mapping].fs->close(filesystems[handles[j].fs_mapping].fshandle, handles[j].handle);
         }
     }
