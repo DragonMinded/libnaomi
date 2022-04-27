@@ -159,7 +159,7 @@ void _enter()
     // We set this to 1 or 0 depending on whether we are in test or normal
     // mode. Save this value locally since the register could change in
     // global constructors below.
-    register uint32_t boot_mode asm("r3");
+    register uint32_t boot_mode asm("r8");
     uint32_t _boot_mode = boot_mode;
 
     // Set up system DMA to allow for things like Maple to operate. This

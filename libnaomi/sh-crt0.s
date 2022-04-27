@@ -3,9 +3,9 @@
 
 start:
     bra bss_zero
-    mov #0,r3
+    mov #0,r8
 start_test:
-    mov #1,r3
+    mov #1,r8
     nop
 
 bss_zero:
