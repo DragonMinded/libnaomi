@@ -206,6 +206,14 @@ int aica_get_channel_position(int channel)
     return aicabase[AICA_CHANNEL_POSITION] & 0xFFFF;
 }
 
+void aica_set_channel_volume(int channel, int vol)
+{
+    volatile uint32_t *aicabase = (volatile uint32_t *)AICA_BASE;
+
+    /* Set volume of channel. */
+    aicabase[CHANNEL(channel, AICA_CFG_VOLUME2)] = 0x20 | ((vol & 0xFF) << 8);
+}
+
 #define LEFT_STEREO_CHANNEL 62
 #define RIGHT_STEREO_CHANNEL 63
 
@@ -390,6 +398,8 @@ typedef struct
 {
     // When this channel is guaranteed to be free, as compared to the millisecond timer.
     uint32_t free_time;
+    // The unique ID of this particular channel, after starting a one-shot or loop sound.
+    uint32_t id;
     // The currently playing sample, so we can free samples if need be.
     sample_info_t * sample;
 } channel_info_t;
@@ -399,6 +409,7 @@ void main()
     // Set up our sample linked list.
     sample_info_t *samples = 0;
     uint32_t bookkeeping_timer = 0;
+    uint32_t sample_id = SAMPLE_ID_START;
 
     // Reset AICA to a known state.
     aica_reset();
@@ -473,6 +484,7 @@ void main()
                                 aica_stop_sound(chan);
                                 channel_info[chan].sample = 0;
                                 channel_info[chan].free_time = 0;
+                                channel_info[chan].id = 0;
                             }
                         }
                         AICA_CMD_BUFFER(CMD_BUFFER_RESPONSE) = RESPONSE_SUCCESS;
@@ -500,6 +512,7 @@ void main()
                                     // Free old sample.
                                     channel_info[chan].sample->flags = 0;
                                     channel_info[chan].sample = 0;
+                                    channel_info[chan].id = 0;
                                 }
 
                                 // Calculate panning and format.
@@ -526,6 +539,7 @@ void main()
 
                                 // We can use this channel.
                                 channel_info[chan].sample = mysample;
+                                channel_info[chan].id = sample_id ++;
                                 if (mysample->sampleloop == 0xFFFFFFFF)
                                 {
                                     channel_info[chan].free_time = millisecond_timer + ((mysample->numsamples * 1000) / mysample->samplerate) + 1;
@@ -563,7 +577,7 @@ void main()
                                 {
                                     aica_start_sound_loop(chan, (void *)mysample->location, format, mysample->numsamples, mysample->samplerate, vol, pan, mysample->sampleloop);
                                 }
-                                AICA_CMD_BUFFER(CMD_BUFFER_RESPONSE) = RESPONSE_SUCCESS;
+                                AICA_CMD_BUFFER(CMD_BUFFER_RESPONSE) = channel_info[chan].id;
                                 break;
                             }
                         }
@@ -574,26 +588,103 @@ void main()
                 {
                     // Find the sample to stop playing.
                     uint32_t location = params[0];
+                    uint32_t id = params[1];
 
-                    sample_info_t *mysample = find_sample(samples, location);
-                    if (mysample)
+                    if (id != 0)
                     {
+                        // Need to stop only the correct channel.
                         for (unsigned int chan = 0; chan < MAX_CHANNELS; chan++)
                         {
-                            if (channel_info[chan].sample == mysample)
+                            if (channel_info[chan].id == id && channel_info[chan].sample != 0)
                             {
                                 aica_stop_sound(chan);
                                 channel_info[chan].sample = 0;
                                 channel_info[chan].free_time = 0;
+                                channel_info[chan].id = 0;
+
+                                AICA_CMD_BUFFER(CMD_BUFFER_RESPONSE) = RESPONSE_SUCCESS;
+                                break;
                             }
                         }
-                        if (mysample->flags & FLAGS_DISCARD_AFTER_USE)
+                    }
+                    else
+                    {
+                        // Kill all samples based on this location.
+                        sample_info_t *mysample = find_sample(samples, location);
+                        if (mysample)
                         {
-                            // Free this sample.
-                            mysample->flags = 0;
+                            for (unsigned int chan = 0; chan < MAX_CHANNELS; chan++)
+                            {
+                                if (channel_info[chan].sample == mysample)
+                                {
+                                    aica_stop_sound(chan);
+                                    channel_info[chan].sample = 0;
+                                    channel_info[chan].free_time = 0;
+                                    channel_info[chan].id = 0;
+                                }
+                            }
+                            if (mysample->flags & FLAGS_DISCARD_AFTER_USE)
+                            {
+                                // Free this sample.
+                                mysample->flags = 0;
+                            }
+
+                            AICA_CMD_BUFFER(CMD_BUFFER_RESPONSE) = RESPONSE_SUCCESS;
+                        }
+                    }
+                    break;
+                }
+                case REQUEST_IS_PLAYING:
+                {
+                    // Find out whether the sample is still playing.
+                    uint32_t id = params[0];
+
+                    if (id != 0)
+                    {
+                        // Need to look up the channel by ID, if it exists it is still playing.
+                        for (unsigned int chan = 0; chan < MAX_CHANNELS; chan++)
+                        {
+                            if (channel_info[chan].id == id && channel_info[chan].sample != 0)
+                            {
+                                AICA_CMD_BUFFER(CMD_BUFFER_RESPONSE) = RESPONSE_SUCCESS;
+                                break;
+                            }
+                        }
+                    }
+                    break;
+                }
+                case REQUEST_CHANGE_PROPERTIES:
+                {
+                    // Find the sample to change properties on.
+                    uint32_t id = params[0];
+                    uint32_t new_loudness = params[1];
+
+                    // Need to update only the correct channel.
+                    if (id == SAMPLE_ID_RINGBUF)
+                    {
+                        if (new_loudness != 0xFFFFFFFF)
+                        {
+                            aica_set_channel_volume(LEFT_STEREO_CHANNEL, 255 - new_loudness);
+                            aica_set_channel_volume(RIGHT_STEREO_CHANNEL, 255 - new_loudness);
                         }
 
                         AICA_CMD_BUFFER(CMD_BUFFER_RESPONSE) = RESPONSE_SUCCESS;
+                    }
+                    else
+                    {
+                        for (unsigned int chan = 0; chan < MAX_CHANNELS; chan++)
+                        {
+                            if (channel_info[chan].id == id && channel_info[chan].sample != 0)
+                            {
+                                if (new_loudness != 0xFFFFFFFF)
+                                {
+                                    aica_set_channel_volume(chan, 255 - new_loudness);
+                                }
+
+                                AICA_CMD_BUFFER(CMD_BUFFER_RESPONSE) = RESPONSE_SUCCESS;
+                                break;
+                            }
+                        }
                     }
                     break;
                 }
@@ -793,6 +884,7 @@ void main()
 
                     // This channel doesn't need a reference to the sample anymore.
                     channel_info[chan].sample = 0;
+                    channel_info[chan].id = 0;
                 }
             }
         }

@@ -23,6 +23,8 @@
 #define REQUEST_STOP_STEREO_RINGBUFFER 0x1009
 #define REQUEST_RINGBUFFER_LOCATION 0x100A
 #define REQUEST_RINGBUFFER_POSITION 0x100B
+#define REQUEST_CHANGE_PROPERTIES 0x100C
+#define REQUEST_IS_PLAYING 0x100D
 
 // Response "register" enumerated values.
 #define RESPONSE_FAILURE 0x0
@@ -38,5 +40,9 @@
 // Constants for the REQUEST_RINGBUFFER_LOCATION/REQUEST_RINGBUFFER_POSITION parameter.
 #define CHANNEL_LEFT 1
 #define CHANNEL_RIGHT 2
+
+// Constants for ringbuffer property change requests.
+#define SAMPLE_ID_START 1024
+#define SAMPLE_ID_RINGBUF 69
 
 #endif

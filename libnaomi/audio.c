@@ -270,7 +270,7 @@ int audio_play_sound(int format, unsigned int samplerate, uint32_t speakers, flo
         }
 
         // Now, play the track.
-        int response = __audio_exchange_command(REQUEST_START_PLAY, location, panning, loudness, 0) == RESPONSE_SUCCESS ? 0 : -1;
+        int response = __audio_exchange_command(REQUEST_START_PLAY, location, panning, loudness, 0);
 
         mutex_unlock(&g2bus_mutex);
         return response;
@@ -359,7 +359,7 @@ int audio_play_registered_sound(int sound, uint32_t speakers, float volume)
         uint32_t loudness = __audio_volume_to_loudness(volume);
 
         mutex_lock(&g2bus_mutex);
-        int retval = __audio_exchange_command(REQUEST_START_PLAY, sound, panning, loudness, 0) == RESPONSE_SUCCESS ? 0 : -1;
+        int retval = __audio_exchange_command(REQUEST_START_PLAY, sound, panning, loudness, 0);
         mutex_unlock(&g2bus_mutex);
 
         return retval;
@@ -383,6 +383,54 @@ int audio_stop_registered_sound(int sound)
     else
     {
         return -1;
+    }
+}
+
+int audio_stop_sound_instance(int instance)
+{
+    if (instance >= SAMPLE_ID_START)
+    {
+        mutex_lock(&g2bus_mutex);
+        int retval = __audio_exchange_command(REQUEST_STOP_PLAY, 0, instance, 0, 0);
+        mutex_unlock(&g2bus_mutex);
+
+        return retval;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+int audio_change_sound_instance_volume(int instance, float volume)
+{
+    if (instance > SAMPLE_ID_START)
+    {
+        mutex_lock(&g2bus_mutex);
+        int retval = __audio_exchange_command(REQUEST_CHANGE_PROPERTIES, instance, __audio_volume_to_loudness(volume), 0xFFFFFFFF, 0xFFFFFFFF);
+        mutex_unlock(&g2bus_mutex);
+
+        return retval;
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+int audio_sound_instance_is_playing(int instance)
+{
+    if (instance >= SAMPLE_ID_START)
+    {
+        mutex_lock(&g2bus_mutex);
+        int retval = __audio_exchange_command(REQUEST_IS_PLAYING, instance, 0, 0, 0) == RESPONSE_SUCCESS;
+        mutex_unlock(&g2bus_mutex);
+
+        return retval;
+    }
+    else
+    {
+        return 0;
     }
 }
 
@@ -804,4 +852,19 @@ int audio_write_mono_data(int channel, void *data, unsigned int num_samples)
 
     mutex_unlock(&g2bus_mutex);
     return actual_samples;
+}
+
+int audio_change_ringbuffer_volume(float volume)
+{
+    if (!leftchannel || !rightchannel)
+    {
+        // We're not initialized!
+        return -1;
+    }
+
+    mutex_lock(&g2bus_mutex);
+    int retval = __audio_exchange_command(REQUEST_CHANGE_PROPERTIES, SAMPLE_ID_RINGBUF, __audio_volume_to_loudness(volume), 0xFFFFFFFF, 0xFFFFFFFF);
+    mutex_unlock(&g2bus_mutex);
+
+    return retval;
 }

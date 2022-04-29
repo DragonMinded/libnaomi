@@ -38,8 +38,10 @@ uint32_t audio_aica_uptime();
 // of the above speaker constants. The volume should be a floating point number
 // between 0.0 and 1.0 inclusive for how loud to play the sample (completely silent
 // to full volume). The number of samples should be less than 65535 as this is the
-// hardware limitation for the length of a sample. Returns 0 on success, and a
-// negative number to indicate that there were no available channels to play on.
+// hardware limitation for the length of a sample. Returns a positive number ID
+// of the instance of the sound being played on success, and a negative number to
+// indicate that there were no available channels to play on. The ID returned can
+// be passed to audio_stop_sound_instance().
 int audio_play_sound(int format, unsigned int samplerate, uint32_t speakers, float volume, void *data, unsigned int num_samples);
 
 // Register a sound to be played later. This will move the soudn to the correct
@@ -50,7 +52,9 @@ int audio_play_sound(int format, unsigned int samplerate, uint32_t speakers, flo
 // 8000-96000, and the speakers should be a bitmask of the above speaker constants.
 // The number of samples should be less than 65535 as this is the hardware
 // limitation for the length of a sample. Returns a negative number if there was
-// no room to register the sound.
+// no room to register the sound, or a positive sound ID which can be passed to
+// audio_unregister_sound(), audio_play_registered_sound(), audio_stop_registered_sound(),
+// audio_stop_registered_sound(), or audio_clear_registered_sound_loop().
 int audio_register_sound(int format, unsigned int samplerate, void *data, unsigned int num_samples);
 
 // Unregister a previously registered sound, freeing that spot up for potentially
@@ -59,9 +63,10 @@ void audio_unregister_sound(int sound);
 
 // Play a previously-registered sound. This will be played on any available audio
 // channel. Passing it a negative number will perform a noop with a negative return.
-// Returns zero on success, or a negative value if there were no available channels.
-// You can call this as many times as you wand and that many copies of the sound
-// will play up to the hardware limit of simultaneous sounds.
+// Returns a positive number ID of thet instance of the soudn being played on
+// success, or a negative value if there were no available channels. You can call
+// this as many times as you wand and that many copies of the sound will play up
+// to the hardware limit of simultaneous sounds.
 int audio_play_registered_sound(int sound, uint32_t speakers, float volume);
 
 // Stop every playing instance of a previously-registered sound. Returns zero on
@@ -80,6 +85,18 @@ int audio_set_registered_sound_loop(int sound, unsigned int loop_point);
 // registered sound not be looped. Note that existing sounds that are currently looping
 // will not be converted to one-shot sounds.
 int audio_clear_registered_sound_loop(int sound);
+
+// Given a sound instance ID returned by either audio_play_sound() or
+// audio_play_registered_sound(), stops only that instance of the sound playing.
+int audio_stop_sound_instance(int instance);
+
+// Given a sound instance ID, returns nonzero if the instance is still playing, or
+// zero otherwise.
+int audio_sound_instance_is_playing(int instance);
+
+// Given a sound instance ID in the same manner documented in the above function, changes
+// the volume of the sound to match the new requested volume.
+int audio_change_sound_instance_volume(int instance, float volume);
 
 // Registers a stereo ringbuffer which can be written to for software-mixed sounds.
 // Returns 0 on successful ringbuffer initialization or a negative number on failure.
@@ -108,6 +125,11 @@ int audio_write_stereo_data(void *data, unsigned int num_samples);
 // is the number of individual samples for the channel. Returns the number of samples
 // that were successfully written.
 int audio_write_mono_data(int channel, void *data, unsigned int num_samples);
+
+// Changes the volume of the registered ringbuffer, similar to the volume given in any
+// other channel. Values are 0.0 for complete silence to 1.0 for full volume. The default
+// is 1.0 if otherwise unchanged.
+int audio_change_ringbuffer_volume(float volume);
 
 #ifdef __cplusplus
 }
