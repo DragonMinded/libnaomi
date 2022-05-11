@@ -158,10 +158,10 @@ struct vertex_list_quad
 #define TA_CMD_POLYGON_FLOAT_COLOR        (1<<4)
 #define TA_CMD_POLYGON_INTENSITY          (2<<4)
 #define TA_CMD_POLYGON_PREVFACE_INTENSITY (3<<4)
-#define TA_CMD_POLYGON_TEXTURED           0x00000008
-#define TA_CMD_POLYGON_SPECULAR_HIGHLIGHT 0x00000004
-#define TA_CMD_POLYGON_GOURAUD_SHADING    0x00000002
-#define TA_CMD_POLYGON_16BIT_UV           0x00000001
+#define TA_CMD_POLYGON_TEXTURED           0x00000008  // Sets below texture bit as well.
+#define TA_CMD_POLYGON_SPECULAR_HIGHLIGHT 0x00000004  // Sets below specular highlight bit as well.
+#define TA_CMD_POLYGON_GOURAUD_SHADING    0x00000002  // Sets below gourad bit as well.
+#define TA_CMD_POLYGON_16BIT_UV           0x00000001  // Sets below 16bit UV bit as well.
 
 // Defines for the mode1 word of the TA cmd.
 #define TA_POLYMODE1_Z_NEVER        (0<<29)
