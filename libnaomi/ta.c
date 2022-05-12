@@ -993,6 +993,7 @@ void ta_fill_box(uint32_t type, vertex_t *verticies, color_t color)
     mypoly.mode2 =
         TA_POLYMODE2_MIPMAP_D_1_00 |
         TA_POLYMODE2_FOG_DISABLED |
+        TA_POLYMODE2_ENABLE_ALPHA |
         TA_POLYMODE2_SRC_BLEND_SRC_ALPHA |
         TA_POLYMODE2_DST_BLEND_INV_SRC_ALPHA;
     mypoly.texture = 0;
@@ -1211,7 +1212,8 @@ void ta_draw_colored_triangle_strip(uint32_t type, uint32_t striplen, textured_v
         TA_CMD_POLYGON_SUBLIST |
         striplen |
         TA_CMD_POLYGON_PACKED_COLOR |
-        TA_CMD_POLYGON_TEXTURED;
+        TA_CMD_POLYGON_TEXTURED |
+        TA_CMD_POLYGON_SPECULAR_HIGHLIGHT;
     mypoly.mode1 =
         TA_POLYMODE1_Z_GREATEREQUAL |
         TA_POLYMODE1_CULL_CW;

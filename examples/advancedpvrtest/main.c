@@ -217,6 +217,16 @@ void main()
         };
         ta_draw_quad(TA_CMD_POLYGON_TYPE_TRANSPARENT, rgba4444sprite, tex[7]);
 
+        /* Draw a translucent box over some sprites. */
+        matrix_init_identity();
+        vertex_t covered_box[4] = {
+            { xcenter - 80.0, ycenter + 30.0, 1.1 },
+            { xcenter - 80.0, ycenter - 30.0, 1.1 },
+            { xcenter, ycenter - 30.0, 1.1 },
+            { xcenter, ycenter + 30.0, 1.1 },
+        };
+        ta_fill_box(TA_CMD_POLYGON_TYPE_TRANSPARENT, covered_box, rgba(0, 255, 255, 100));
+
         /* Now, draw some font text. */
         ta_draw_text(32, 85, font_18pt, rgb(255, 255, 255), "Hello, world!");
         ta_draw_text(32, 105, font_12pt, rgb(0, 255, 244), "Hello, world!");
