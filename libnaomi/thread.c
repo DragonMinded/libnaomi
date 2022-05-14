@@ -365,7 +365,7 @@ uint32_t _thread_time_elapsed()
 {
     if (current_profile != 0)
     {
-        return _profile_get_current(0) - current_profile;
+        return _profile_get_current() - current_profile;
     }
     else
     {
@@ -866,7 +866,7 @@ int _thread_wake_waiting_semaphore(semaphore_internal_t *semaphore)
 uint32_t _thread_wake_waiting_timer()
 {
     // Calculate the time since we did our last adjustments.
-    uint64_t new_profile = _profile_get_current(0);
+    uint64_t new_profile = _profile_get_current();
     uint32_t time_elapsed = 0;
     if (current_profile != 0)
     {
@@ -1074,17 +1074,17 @@ irq_state_t *_syscall_timer(irq_state_t *current, int timer)
     if (timer < 0)
     {
         // Periodic preemption timer.
-        uint64_t start = _profile_get_current(0);
+        uint64_t start = _profile_get_current();
         uint32_t elapsed = _thread_wake_waiting_timer();
         interruptions ++;
 
         // Calculate stats, less the overhead from the above section of code.
-        uint64_t calc = _profile_get_current(0);
+        uint64_t calc = _profile_get_current();
         _thread_calc_stats(current, elapsed, calc - start);
         current = _thread_schedule(current, THREAD_SCHEDULE_ANY);
 
         // Make sure to adjust the denominator by the overhead after calculating stats.
-        uint64_t done = _profile_get_current(0);
+        uint64_t done = _profile_get_current();
         running_time_denominator += done - calc;
     }
 
@@ -1100,7 +1100,7 @@ irq_state_t *_syscall_holly(irq_state_t *current, uint32_t serviced_holly_interr
         return current;
     }
 
-    uint64_t start = _profile_get_current(0);
+    uint64_t start = _profile_get_current();
     int should_schedule = 0;
 
     if (serviced_holly_interrupts & HOLLY_SERVICED_VBLANK_IN)
@@ -1146,12 +1146,12 @@ irq_state_t *_syscall_holly(irq_state_t *current, uint32_t serviced_holly_interr
         interruptions ++;
 
         // Calculate stats, less the overhead from the above section of code.
-        uint64_t calc = _profile_get_current(0);
+        uint64_t calc = _profile_get_current();
         _thread_calc_stats(current, elapsed, calc - start);
         current = _thread_schedule(current, THREAD_SCHEDULE_ANY);
 
         // Make sure to adjust the denominator by the overhead after calculating stats.
-        uint64_t done = _profile_get_current(0);
+        uint64_t done = _profile_get_current();
         running_time_denominator += done - calc;
     }
 
@@ -1167,7 +1167,7 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
         return current;
     }
 
-    uint64_t start = _profile_get_current(0);
+    uint64_t start = _profile_get_current();
     int schedule = THREAD_SCHEDULE_CURRENT;
 
     switch (which)
@@ -1730,12 +1730,12 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
     interruptions ++;
 
     // Add the current running time to the current process to keep track of stats.
-    uint64_t calc = _profile_get_current(0);
+    uint64_t calc = _profile_get_current();
     _thread_calc_stats(current, elapsed, calc - start);
     current = _thread_schedule(current, schedule);
 
     // Make sure to adjust the denominator by the overhead after calculating stats.
-    uint64_t done = _profile_get_current(0);
+    uint64_t done = _profile_get_current();
     running_time_denominator += done - calc;
     return current;
 }

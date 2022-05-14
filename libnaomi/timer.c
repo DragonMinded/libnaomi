@@ -255,10 +255,14 @@ uint32_t _timer_elapsed(int timer)
     }
 
     // Grab elapsed time, restore interrupts.
-    uint32_t elapsed = reset_values[timer] - _timer_left(timer);
+    int64_t elapsed = (int64_t)reset_values[timer] - (int64_t)_timer_left(timer);
+    if (elapsed < 0 || elapsed > (int64_t)reset_values[timer])
+    {
+        elapsed = 0;
+    }
     irq_restore(old_interrupts);
 
-    return elapsed;
+    return (uint32_t)elapsed;
 }
 
 int _timer_available()
@@ -291,11 +295,24 @@ int _timer_available()
 
 static uint64_t profile_timers[MAX_PROFILERS];
 static uint64_t profile_current;
+static int64_t profile_last;
 static int profile_timer = -1;
+static int profile_underflows = 0;
 
 int _profile_cb(int timer)
 {
+    // First, adjust by one amount, plus any underflows that happened in the meantime.
     profile_current += MAX_PROFILE_MICROSECONDS;
+    if (profile_underflows > 1)
+    {
+        for (int i = 1; i < profile_underflows; i++)
+        {
+            profile_current += MAX_PROFILE_MICROSECONDS;
+        }
+    }
+
+    // No more underflows!
+    profile_underflows = 0;
 
     // Inform the scheduler that this was a regular callback.
     return 0;
@@ -308,6 +325,8 @@ void _profile_init()
 
     memset(profile_timers, 0, sizeof(uint64_t) * MAX_PROFILERS);
     profile_current = 0;
+    profile_underflows = 0;
+    profile_last = 0;
     profile_timer = _timer_available();
     if (profile_timer >= 0 && profile_timer < MAX_HW_TIMERS)
     {
@@ -330,14 +349,48 @@ void _profile_free()
     profile_timer = -1;
 }
 
-uint64_t _profile_get_current(uint32_t adjustments)
+uint64_t _profile_get_current()
 {
     uint32_t old_interrupts = irq_disable();
-    uint64_t amount = 0;
+    int64_t amount = 0;
 
     if (profile_timer >= 0 && profile_timer < MAX_HW_TIMERS)
     {
-        amount = profile_current + _timer_elapsed(profile_timer) + (adjustments * MAX_PROFILE_MICROSECONDS);
+        // First, assume we don't have any rollover issues.
+        amount = (int64_t)profile_current + (int64_t)_timer_elapsed(profile_timer) + ((int64_t)profile_underflows * MAX_PROFILE_MICROSECONDS);
+        if (amount < 0)
+        {
+            _irq_display_invariant("profile failure", "got negative amount for elapsed time!");
+        }
+
+        // We could have a race condition in the above, so lets sanity check and adjust accordingly.
+        // Checking the hardware rollover bit (which also generates interrupts) seems racy, at least
+        // on emulators. I also see issues with handling things that way on hardware. So, lets infer
+        // rollover here. Note that this breaks down if you both a) disable interrupts completely and
+        // b) also don't call _profile_get_current() more than once a second. This is highly unlikely
+        // as normal operation leaves interrupts on and so, so many subsystems use the current profile
+        // value.
+        if(amount < profile_last)
+        {
+            if ((profile_last - amount) < MAX_PROFILE_MICROSECONDS)
+            {
+                // We can just adjust.
+                amount += MAX_PROFILE_MICROSECONDS;
+                profile_underflows++;
+            }
+            else
+            {
+                // Something else happened.
+                _irq_display_invariant(
+                    "profile failure",
+                    "profile counter seems to have gone backwards, %lld < %lld!",
+                    amount,
+                    profile_last
+                );
+            }
+        }
+
+        profile_last = amount;
     }
 
     irq_restore(old_interrupts);
@@ -355,7 +408,7 @@ int profile_start()
         {
             if (profile_timers[slot] == 0)
             {
-                profile_timers[slot] = _profile_get_current(0);
+                profile_timers[slot] = _profile_get_current();
                 profile_slot = slot;
                 break;
             }
@@ -373,7 +426,7 @@ uint64_t profile_end(int profile)
 
     if (profile >= 0 && profile < MAX_PROFILERS && profile_timers[profile] != 0)
     {
-        elapsed = _profile_get_current(0) - profile_timers[profile];
+        elapsed = _profile_get_current() - profile_timers[profile];
         profile_timers[profile] = 0;
     }
 
@@ -384,47 +437,28 @@ uint64_t profile_end(int profile)
 
 void timer_wait(uint32_t microseconds)
 {
-    // First, figure out if interrupts are disabled (have to manually increment
-    // the profiler in this case).
     uint32_t old_interrupts = irq_disable();
-    unsigned int irq_disabled = _irq_is_disabled(old_interrupts);
-    int timer = profile_timer;
-    irq_restore(old_interrupts);
 
-    // Now, wait until the profile timer has passed our elapsed microseconds.
-    if (timer >= 0 && timer < MAX_HW_TIMERS)
+    // Wait until the profile timer has passed our elapsed microseconds.
+    if (profile_timer >= 0 && profile_timer < MAX_HW_TIMERS)
     {
-        // We base this busyloop wait on the profile timer.
-        uint64_t old_value = _profile_get_current(0);
-        uint32_t adjustments = 0;
+        // This will re-enable if we were enabled, and stay disabled if we were disabled.
+        uint64_t old_value = _profile_get_current();
+        irq_restore(old_interrupts);
 
-        while ((_profile_get_current(adjustments) - old_value) < microseconds)
-        {
-            if (irq_disabled && (TIMER_TCR(timer) & 0x100))
-            {
-                // This should not clear any pending interrupts for the timer, so
-                // we don't adjust the profiler timer itself as it will make an
-                // adjustment to its own counter inside the profile interrupt handler
-                // callback.
-                TIMER_TCR(timer) &= ~0x100;
-                adjustments++;
-            }
-        }
-
-        // Its possible that the profiler would miss an interrupt if we had interrupts
-        // disabled and waited for a REALLY long time. So, fix that here.
-        if (adjustments > 1)
-        {
-            profile_current += ((adjustments - 1) * MAX_PROFILE_MICROSECONDS);
-        }
+        // We can just busyloop, the profile response will be accurate!
+        while ((_profile_get_current() - old_value) < microseconds) { ; }
+    }
+    else
+    {
+        // No profiler, just return.
+        irq_restore(old_interrupts);
     }
 }
 
 typedef struct
 {
     unsigned int handle;
-    unsigned int irq_disabled;
-    unsigned int adjustments;
     uint32_t microseconds;
     uint64_t profile_start;
 } timer_t;
@@ -452,7 +486,6 @@ void _user_timer_free()
 int timer_start(uint32_t microseconds)
 {
     uint32_t old_interrupts = irq_disable();
-    unsigned int irq_disabled = _irq_is_disabled(old_interrupts);
     int timer = -1;
 
     for (unsigned int i = 0; i < MAX_TIMERS; i++)
@@ -464,9 +497,7 @@ int timer_start(uint32_t microseconds)
         {
             // Found a timer! Rememer its full handle so we can compare later.
             timers[slot].handle = handle;
-            timers[slot].profile_start = _profile_get_current(0);
-            timers[slot].adjustments = 0;
-            timers[slot].irq_disabled = irq_disabled;
+            timers[slot].profile_start = _profile_get_current();
             timers[slot].microseconds = microseconds;
 
             // Set our timer counter to this handle + 1 so that we find the next
@@ -496,8 +527,6 @@ void timer_stop(int timer)
             // Found the previously allocated timer.
             timers[slot].handle = 0;
             timers[slot].profile_start = 0;
-            timers[slot].adjustments = 0;
-            timers[slot].irq_disabled = 0;
             timers[slot].microseconds = 0;
         }
     }
@@ -518,26 +547,8 @@ uint32_t _timer_elapsed_or_left(int timer, int which)
         unsigned int slot = timer % MAX_TIMERS;
         if (timers[slot].handle == timer)
         {
-            // Found the previously allocated timer.
-            if (timers[slot].irq_disabled && (TIMER_TCR(timer) & 0x100))
-            {
-                // This should not clear any pending interrupts for the timer, so
-                // we don't adjust the profiler timer itself as it will make an
-                // adjustment to its own counter inside the profile interrupt handler
-                // callback. Note, however, that if you wait a very long time (more
-                // than a second) between two calls to timer_left or timer_elapsed
-                // and you are running with interrupts disabled, the return values for
-                // timer_left and timer_elapsed could be wrong (we don't know how many
-                // adjustments to add here, since we don't know how many overflows occured).
-                // It is not recommended to run for that amount of time without interrupts,
-                // however, as many other things in the system will break, such as the
-                // profile timer.
-                TIMER_TCR(timer) &= ~0x100;
-                timers[slot].adjustments++;
-            }
-
             // Calculate actual delta.
-            calculated = _profile_get_current(timers[slot].adjustments) - timers[slot].profile_start;
+            calculated = _profile_get_current() - timers[slot].profile_start;
             if (calculated > timers[slot].microseconds)
             {
                 calculated = timers[slot].microseconds;

@@ -1329,28 +1329,42 @@ _CLOCK_T_ _times_r(struct _reent *reent, struct tms *tm)
 // like unix and C standard library expects.
 #define TWENTY_YEARS ((20 * 365LU + 5) * 86400)
 
-static uint32_t rtc_last_read = 0;
+static uint32_t rtc_first_read = 0;
+static uint64_t profile_first_read = 0;
 static uint64_t profile_last_read = 0;
 
 void _posix_clear_gettimeofday()
 {
-    rtc_last_read = 0;
-    profile_last_read = 0;
+    rtc_first_read = 0;
+    profile_first_read = 0;
 }
 
 int _gettimeofday_r(struct _reent *reent, struct timeval *tv, void *tz)
 {
     uint32_t old_irq = irq_disable();
-    if (rtc_last_read == 0)
-    {
-        rtc_last_read = rtc_get() - TWENTY_YEARS;
-        profile_last_read = _profile_get_current(0);
-    }
-    irq_restore(old_irq);
 
-    uint64_t now = _profile_get_current(0) - profile_last_read;
-    tv->tv_sec = (now / 1000000) + rtc_last_read;
+    // First-call initialization.
+    if (rtc_first_read == 0)
+    {
+        rtc_first_read = rtc_get() - TWENTY_YEARS;
+        profile_first_read = _profile_get_current();
+        profile_last_read = profile_first_read;
+    }
+
+    // Verify that we are not going backwards, this should always increase.
+    uint64_t profile_next_read = _profile_get_current();
+    if (profile_next_read < profile_last_read)
+    {
+        _irq_display_invariant("time failure", "time seems to have gone backwards, %llu < %llu!", profile_next_read, profile_last_read);
+    }
+    profile_last_read = profile_next_read;
+
+    // Calculate seconds and microseconds based on above read delta.
+    uint64_t now = profile_next_read - profile_first_read;
+    tv->tv_sec = (now / 1000000) + rtc_first_read;
     tv->tv_usec = now % 1000000;
+
+    irq_restore(old_irq);
     return 0;
 }
 

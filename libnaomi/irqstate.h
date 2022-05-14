@@ -63,7 +63,7 @@ irq_state_t *_syscall_holly(irq_state_t *current, uint32_t serviced_holly_interr
 
 void _thread_create_idle();
 void _thread_register_main(irq_state_t *state);
-uint64_t _profile_get_current(uint32_t adjustments);
+uint64_t _profile_get_current();
 
 void _irq_display_exception(int signal, irq_state_t *cur_state, char *failure, int code);
 
