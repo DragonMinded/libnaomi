@@ -12,6 +12,9 @@ from netdimm import NetDimm, PeekPokeTypeEnum, receive_message, MESSAGE_HOST_STD
 from naomi import NaomiRom
 
 
+MAX_PACKET_SIZE: int = 512
+
+
 def gdb_strip_ack(data: bytes) -> Tuple[Optional[bool], bytes]:
     if data[0:1] == b'-':
         return False, data[1:]
@@ -85,7 +88,9 @@ def gdb_make_crc(packet: bytes) -> bytes:
 
 
 def target_make_crc(addr: int) -> int:
-    addr = addr & 0x00FFFFFF
+    if (addr & 0xFF) != 0:
+        raise Exception("Address must be 256-byte aligned!")
+    addr = (addr >> 8) & 0x00FFFFFF
     crc = ~(((addr & 0xFF) + ((addr >> 8) & 0xFF) + ((addr >> 16) & 0xFF)) & 0xFF)
     return ((crc << 24) & 0xFF000000) | addr
 
@@ -93,7 +98,7 @@ def target_make_crc(addr: int) -> int:
 def target_validate_crc(addr: int) -> Optional[int]:
     crc = ~(((addr & 0xFF) + ((addr >> 8) & 0xFF) + ((addr >> 16) & 0xFF)) & 0xFF)
     if ((addr >> 24) & 0xFF) == (crc & 0xFF):
-        return addr & 0x00FFFFFF
+        return (addr & 0x00FFFFFF) << 8
     else:
         return None
 
@@ -109,6 +114,8 @@ def gdb_peek_packet(netdimm: NetDimm, knock_address: int, ringbuffer_address: in
         if length == 0xFFFFFFFF:
             return None
         else:
+            if length > MAX_PACKET_SIZE:
+                raise Exception("Response packet too large!")
             return netdimm.receive_chunk(loc + 8, length)
     elif valid != 0:
         return b""
@@ -122,7 +129,7 @@ def gdb_handle_packet(netdimm: NetDimm, knock_address: int, ringbuffer_address: 
 
         # For now, only reply with the max packet size. In the future we need
         # to advertise what we do support.
-        return True, b"PacketSize=512"
+        return True, (f"PacketSize={MAX_PACKET_SIZE}").encode('ascii')
 
     if packet == b"qSymbol::":
         # Symbol lookup, we don't need to handle this.
@@ -132,6 +139,9 @@ def gdb_handle_packet(netdimm: NetDimm, knock_address: int, ringbuffer_address: 
         # GDB is probing us to see if we handle this correctly. We must return
         # an empty string, as the packet states.
         return True, b""
+
+    if len(packet) > MAX_PACKET_SIZE:
+        raise Exception("Request packet too large!")
 
     # Packet that should be handled by the Naomi. First, lay it down the packet
     # itself so it can be read by the target.
@@ -151,6 +161,8 @@ def gdb_handle_packet(netdimm: NetDimm, knock_address: int, ringbuffer_address: 
         if length == 0xFFFFFFFF:
             return True, None
         else:
+            if length > MAX_PACKET_SIZE:
+                raise Exception("Response packet too large!")
             return True, netdimm.receive_chunk(loc + 8, length)
     elif valid != 0:
         return True, b""
@@ -205,10 +217,11 @@ def main() -> int:
     netdimm = NetDimm(args.ip, log=print)
     with netdimm.connection():
         # First, establish where the GDB buffers should be placed on the
-        # remote target. Round the end of the ROM to a multiple of 4 for
-        # ease of access from the target.
+        # remote target. Round the end of the ROM to a multiple of 256 so
+        # that we have a byte of room to CRC the address. This is also 4
+        # byte aligned for ease of access on target.
         info = netdimm.info()
-        buffer_loc = (info.current_game_size + 3) & 0xFFFFFFFFC
+        buffer_loc = (info.current_game_size + 255) & 0xFFFFFF00
 
         # Read the ROM header to determine where the entrypoint address is.
         # We use this to write our ringbuffer address and to generate interrupts

@@ -187,7 +187,7 @@ int _dimm_command_handler(int halted, irq_state_t *cur_state)
                         /* Must check for GDB knock address. */
                         if ((address & 0x01FFFFFF) == (START_ADDR & 0x01FFFFFF) && _gdb_check_address(value))
                         {
-                            halted = _gdb_handle_command(value & 0x00FFFFFF, cur_state);
+                            halted = _gdb_handle_command((value & 0x00FFFFFF) << 8, cur_state);
                         }
                         else
                         {

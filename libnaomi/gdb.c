@@ -19,7 +19,7 @@
 static uint32_t buffer_offset = 0;
 
 // Any pending GDB response that we wish to send to the host.
-static char response_packet[MAX_PACKET_SIZE + 1];
+static char response_packet[MAX_PACKET_SIZE + 8];
 static int response_length = 0;
 
 // Various operations that can be targetted at a particular thread.
@@ -68,10 +68,12 @@ uint32_t _gdb_handle_response()
     }
 
     // Format the response location and such, making sure to account for the
-    // size of the header in the request.
-    uint32_t response_address = buffer_offset + MAX_PACKET_SIZE + 4;
-    uint32_t crc = ~(((response_address & 0xFF) + ((response_address >> 8) & 0xFF) + ((response_address >> 16) & 0xFF)) & 0xFF);
-    uint32_t response = ((crc << 24) & 0xFF000000) | (response_address & 0x00FFFFFF);
+    // size of the header in the request. We also need it aligned to a 256-byte
+    // boundary.
+    uint32_t response_address = ((buffer_offset + MAX_PACKET_SIZE + 4) + 255) & 0xFFFFFF00;
+    uint32_t crc_address = (response_address >> 8);
+    uint32_t crc = ~(((crc_address & 0xFF) + ((crc_address >> 8) & 0xFF) + ((crc_address >> 16) & 0xFF)) & 0xFF);
+    uint32_t response = ((crc << 24) & 0xFF000000) | (crc_address & 0x00FFFFFF);
 
     // Copy the response over.
     if (response_length & 1)
@@ -98,27 +100,14 @@ void _gdb_send_valid_response(char *response, ...)
     memcpy(&response_packet[0], &valid, 4);
 
     // Perform varargs against the response.
-    static char buffer[MAX_PACKET_SIZE + 1];
     va_list args;
     va_start(args, response);
-    int length = vsnprintf(buffer, MAX_PACKET_SIZE, response, args);
+    int length = vsnprintf(&response_packet[8], MAX_PACKET_SIZE, response, args);
     va_end(args);
 
-    if (length >= 0)
-    {
-        if (length > MAX_PACKET_SIZE)
-        {
-            length = MAX_PACKET_SIZE;
-        }
-        buffer[length] = 0;
-    }
-
     // Write out how big it is.
-    uint32_t size = strlen(buffer);
+    uint32_t size = (length < 0) ? 0 : ((length >= MAX_PACKET_SIZE) ? MAX_PACKET_SIZE : length);
     memcpy(&response_packet[4], &size, 4);
-
-    // Write out the packet data itself.
-    memcpy(&response_packet[8], buffer, size);
 
     // Mark that we have a packet.
     response_length = size + 8;
@@ -449,6 +438,12 @@ int _gdb_handle_command(uint32_t address, irq_state_t *cur_state)
     if (size > 0)
     {
         // Make sure we read even numbers only.
+        if (size > MAX_PACKET_SIZE)
+        {
+            _irq_display_invariant("gdb failure", "Requested packet size %u > %u!", size, MAX_PACKET_SIZE);
+        }
+
+        // Now, read it!
         cart_read(cmdbuf, address + 4, (size + 1) & 0xFFFFFFFE);
         if (size & 1)
         {
