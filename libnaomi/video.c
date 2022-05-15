@@ -61,6 +61,22 @@ unsigned int buffer_loc = 0;
 #define current_buffer_loc ((buffer_loc) ? 1 : 0)
 #define next_buffer_loc ((buffer_loc) ? 0 : 1)
 
+// Defines in thread.c which help us to handle vblank interrupts.
+void _thread_wait_vblank_swapbuffers();
+
+void _video_swap_vbuffers()
+{
+    volatile unsigned int *videobase = (volatile unsigned int *)POWERVR2_BASE;
+
+    // Swap buffers in HW.
+    videobase[POWERVR2_FB_DISPLAY_ADDR_1] = global_buffer_offset[current_buffer_loc];
+    videobase[POWERVR2_FB_DISPLAY_ADDR_2] = global_buffer_offset[current_buffer_loc] + (global_video_width * global_video_depth);
+
+    // Swap buffer pointer in SW.
+    buffer_loc = next_buffer_loc;
+    buffer_base = (void *)((VRAM_BASE + global_buffer_offset[current_buffer_loc]) | UNCACHED_MIRROR);
+}
+
 void video_display_on_vblank()
 {
     volatile unsigned int *videobase = (volatile unsigned int *)POWERVR2_BASE;
@@ -90,28 +106,12 @@ void video_display_on_vblank()
         while((videobase[POWERVR2_SYNC_STAT] & 0x1FF) != vblank_in_position) { ; }
 
         // Swap buffers in HW.
-        videobase[POWERVR2_FB_DISPLAY_ADDR_1] = global_buffer_offset[current_buffer_loc];
-        videobase[POWERVR2_FB_DISPLAY_ADDR_2] = global_buffer_offset[current_buffer_loc] + (global_video_width * global_video_depth);
-
-        // Swap buffer pointer in SW.
-        buffer_loc = next_buffer_loc;
-        buffer_base = (void *)((VRAM_BASE + global_buffer_offset[current_buffer_loc]) | UNCACHED_MIRROR);
+        _video_swap_vbuffers();
     }
     else
     {
         // Wait for hardware vblank interrupt.
-        thread_wait_vblank_in();
-
-        // Swap buffers in HW.
-        videobase[POWERVR2_FB_DISPLAY_ADDR_1] = global_buffer_offset[current_buffer_loc];
-        videobase[POWERVR2_FB_DISPLAY_ADDR_2] = global_buffer_offset[current_buffer_loc] + (global_video_width * global_video_depth);
-
-        // Swap buffer pointer in SW.
-        buffer_loc = next_buffer_loc;
-        buffer_base = (void *)((VRAM_BASE + global_buffer_offset[current_buffer_loc]) | UNCACHED_MIRROR);
-
-        // No longer need our high priority status, yield to other threads.
-        thread_yield();
+        _thread_wait_vblank_swapbuffers();
     }
 
     // Finish filling in the background. Gotta do this now, fast or slow, because

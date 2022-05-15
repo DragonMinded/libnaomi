@@ -11,7 +11,13 @@
 
 // Memory range validation functions, because invalid pointers can cause reboot
 // crashes on real hardware.
-extern int _valid_memory_range(void *addr);
+int _valid_memory_range(void *addr);
+
+// Prototypes for libnaomi work that must be done directly after an interrupt. I guess
+// we could also support RTOS-like threadlets with guaranteed no-interruptions but I
+// don't think its worth it to support an entire new thread system for IRQs just for
+// a few system libraries.
+void _video_swap_vbuffers();
 
 #define SEM_TYPE_MUTEX 1
 #define SEM_TYPE_SEMAPHORE 2
@@ -114,6 +120,7 @@ typedef struct
     uint32_t waiting_thread;
     uint32_t waiting_timer;
     unsigned int waiting_interrupt;
+    unsigned int perform_additional_on_wake;
 
     // Counters for TA resources this thread is waiting on.
     int waiting_irq[WAITING_TA_MAX];
@@ -943,9 +950,30 @@ int _thread_wake_waiting_irq(unsigned int which)
         if (threads[i]->waiting_interrupt == which)
         {
             // This thread is waiting on the resource that just became available!
+            if (threads[i]->perform_additional_on_wake)
+            {
+                // Perform the operation that we need to perform, given the interrupt we just waited on.
+                switch(which)
+                {
+                    case WAITING_IRQ_VBLANK_IN:
+                    {
+                        // Swap buffers to draw to the screen.
+                        _video_swap_vbuffers();
+                        break;
+                    }
+                }
+            }
+            else
+            {
+                // Userspace wait, bump the priority so that the code gets RTOS-like
+                // priority for a bit.
+                _thread_enable_critical(threads[i]);
+            }
+
+            // Mark ourselves as handling this, let the thread wake up.
             threads[i]->waiting_interrupt = 0;
+            threads[i]->perform_additional_on_wake = 0;
             threads[i]->state = THREAD_STATE_RUNNING;
-            _thread_enable_critical(threads[i]);
             scheduled = 1;
         }
     }
@@ -1580,6 +1608,7 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
                 _thread_check_waiting(thread);
                 thread->state = THREAD_STATE_WAITING;
                 thread->waiting_interrupt = current->gp_regs[4];
+                thread->perform_additional_on_wake = current->gp_regs[5];
                 schedule = THREAD_SCHEDULE_OTHER;
             }
             else
@@ -2340,19 +2369,29 @@ void thread_sleep(uint32_t us)
 void thread_wait_vblank_in()
 {
     register uint32_t syscall_param0 asm("r4") = WAITING_IRQ_VBLANK_IN;
-    asm("trapa #13" : : "r" (syscall_param0));
+    register uint32_t syscall_param1 asm("r5") = 0;
+    asm("trapa #13" : : "r" (syscall_param0), "r" (syscall_param1));
+}
+
+void _thread_wait_vblank_swapbuffers()
+{
+    register uint32_t syscall_param0 asm("r4") = WAITING_IRQ_VBLANK_IN;
+    register uint32_t syscall_param1 asm("r5") = 1;
+    asm("trapa #13" : : "r" (syscall_param0), "r" (syscall_param1));
 }
 
 void thread_wait_vblank_out()
 {
     register uint32_t syscall_param0 asm("r4") = WAITING_IRQ_VBLANK_OUT;
-    asm("trapa #13" : : "r" (syscall_param0));
+    register uint32_t syscall_param1 asm("r5") = 0;
+    asm("trapa #13" : : "r" (syscall_param0), "r" (syscall_param1));
 }
 
 void thread_wait_hblank()
 {
     register uint32_t syscall_param0 asm("r4") = WAITING_IRQ_HBLANK;
-    asm("trapa #13" : : "r" (syscall_param0));
+    register uint32_t syscall_param1 asm("r5") = 0;
+    asm("trapa #13" : : "r" (syscall_param0), "r" (syscall_param1));
 }
 
 void _thread_notify_impl(int waiting_irq)
