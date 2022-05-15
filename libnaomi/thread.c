@@ -18,6 +18,7 @@ int _valid_memory_range(void *addr);
 // don't think its worth it to support an entire new thread system for IRQs just for
 // a few system libraries.
 void _video_swap_vbuffers();
+void _ta_begin_render(void *buffers, void *scrn);
 
 #define SEM_TYPE_MUTEX 1
 #define SEM_TYPE_SEMAPHORE 2
@@ -1729,6 +1730,30 @@ irq_state_t *_syscall_trapa(irq_state_t *current, unsigned int which)
 
             break;
         }
+        case 18:
+        {
+            // _thread_ta_render, which starts rendering and then waits for completion.
+            thread_t *thread = (thread_t *)current->threadptr;
+            if (thread)
+            {
+                // First, we have to actually trigger TA render start.
+                void *buffers = (void *)current->gp_regs[4];
+                void *scrn = (void *)current->gp_regs[5];
+                _ta_begin_render(buffers, scrn);
+
+                // Put the thread to sleep, waiting for the render finished interrupt.
+                _thread_check_waiting(thread);
+                thread->waiting_irq[WAITING_TA_RENDER_FINISHED] = 0;
+                thread->state = THREAD_STATE_WAITING;
+                schedule = THREAD_SCHEDULE_OTHER;
+            }
+            else
+            {
+                // Should never happen.
+                _irq_display_exception(SIGABRT, current, "cannot locate thread object", which);
+            }
+            break;
+        }
         case 253:
         {
             // Reserved for GDB software breakpoints. Like the below, we should
@@ -2420,45 +2445,41 @@ void _thread_notify_impl(int waiting_irq)
     irq_restore(old_interrupts);
 }
 
-void thread_notify_wait_ta_render_finished()
-{
-    _thread_notify_impl(WAITING_TA_RENDER_FINISHED);
-}
-
-void thread_notify_wait_ta_load_opaque()
+void _thread_notify_wait_ta_load_opaque()
 {
     _thread_notify_impl(WAITING_TA_LOAD_OPAQUE_FINISHED);
 }
 
-void thread_notify_wait_ta_load_transparent()
+void _thread_notify_wait_ta_load_transparent()
 {
     _thread_notify_impl(WAITING_TA_LOAD_TRANSPARENT_FINISHED);
 }
 
-void thread_notify_wait_ta_load_punchthru()
+void _thread_notify_wait_ta_load_punchthru()
 {
     _thread_notify_impl(WAITING_TA_LOAD_PUNCHTHRU_FINISHED);
 }
 
-void thread_wait_ta_render_finished()
+void _thread_ta_render(void *buffers, void *screen)
 {
-    register uint32_t syscall_param0 asm("r4") = WAITING_TA_RENDER_FINISHED;
-    asm("trapa #15" : : "r" (syscall_param0));
+    register void * syscall_param0 asm("r4") = buffers;
+    register void * syscall_param1 asm("r5") = screen;
+    asm("trapa #18" : : "r" (syscall_param0), "r" (syscall_param1));
 }
 
-void thread_wait_ta_load_opaque()
+void _thread_wait_ta_load_opaque()
 {
     register uint32_t syscall_param0 asm("r4") = WAITING_TA_LOAD_OPAQUE_FINISHED;
     asm("trapa #15" : : "r" (syscall_param0));
 }
 
-void thread_wait_ta_load_transparent()
+void _thread_wait_ta_load_transparent()
 {
     register uint32_t syscall_param0 asm("r4") = WAITING_TA_LOAD_TRANSPARENT_FINISHED;
     asm("trapa #15" : : "r" (syscall_param0));
 }
 
-void thread_wait_ta_load_punchthru()
+void _thread_wait_ta_load_punchthru()
 {
     register uint32_t syscall_param0 asm("r4") = WAITING_TA_LOAD_PUNCHTHRU_FINISHED;
     asm("trapa #15" : : "r" (syscall_param0));

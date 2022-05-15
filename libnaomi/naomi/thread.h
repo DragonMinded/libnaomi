@@ -170,27 +170,6 @@ void thread_wait_vblank_out();
 // to return yourself to normal priority after finishing vblank-dependent work.
 void thread_wait_hblank();
 
-// Notify the thread system that you want to wait for the TA to finish loading or rendering.
-// Because this interrupt is only fired once when the TA is finished, its possible to miss it
-// if you set up for rendering and then wait to render. This will cause deadlock in the system.
-// So, you must let the thread system know you want to wait for the TA to finish before
-// asking to wait. You should do this before calling any function that would cause the TA to
-// start and then finish rendering.
-void thread_notify_wait_ta_render_finished();
-void thread_notify_wait_ta_load_opaque();
-void thread_notify_wait_ta_load_transparent();
-void thread_notify_wait_ta_load_punchthru();
-
-// Wait for the TA to finish loading or rendering. If you haven't called the respective above
-// notify function first then this function returns immediately without waiting. If the TA has
-// already finished loading or rendering since you called the previous notify function when you
-// call this function, it will also return immediately without waiting. Otherwise, it parks the
-// thread until the TA finishes loading or rendering and then wakes it at critical priority.
-void thread_wait_ta_render_finished();
-void thread_wait_ta_load_opaque();
-void thread_wait_ta_load_transparent();
-void thread_wait_ta_load_punchthru();
-
 // Exit a thread early, returning return value. Identical to letting control reach the end
 // of the thread function with a return statement.
 void thread_exit(void *retval);

@@ -19,6 +19,15 @@ void _queue_exclusive_release();
 void _hw_memcpy(void *dest, void *src, unsigned int amount);
 void _hw_memset(void *addr, uint32_t value, unsigned int amount);
 
+/* Prototypes for the parts of TA that need to live in the kernel. */
+void _thread_notify_wait_ta_load_opaque();
+void _thread_notify_wait_ta_load_transparent();
+void _thread_notify_wait_ta_load_punchthru();
+void _thread_ta_render(void *buffers, void *screen);
+void _thread_wait_ta_load_opaque();
+void _thread_wait_ta_load_transparent();
+void _thread_wait_ta_load_punchthru();
+
 /* What lists we populated and need to wait to finish filling. */
 static unsigned int waiting_lists = 0;
 
@@ -56,7 +65,7 @@ void ta_commit_list(void *src, int len)
             {
                 waiting_lists |= WAITING_LIST_OPAQUE;
                 populated_lists |= WAITING_LIST_OPAQUE;
-                thread_notify_wait_ta_load_opaque();
+                _thread_notify_wait_ta_load_opaque();
             }
         }
         else if ((command & 0x07000000) == TA_CMD_POLYGON_TYPE_TRANSPARENT)
@@ -69,7 +78,7 @@ void ta_commit_list(void *src, int len)
             {
                 waiting_lists |= WAITING_LIST_TRANSPARENT;
                 populated_lists |= WAITING_LIST_TRANSPARENT;
-                thread_notify_wait_ta_load_transparent();
+                _thread_notify_wait_ta_load_transparent();
             }
         }
         else if ((command & 0x07000000) == TA_CMD_POLYGON_TYPE_PUNCHTHRU)
@@ -82,7 +91,7 @@ void ta_commit_list(void *src, int len)
             {
                 waiting_lists |= WAITING_LIST_PUNCHTHRU;
                 populated_lists |= WAITING_LIST_PUNCHTHRU;
-                thread_notify_wait_ta_load_punchthru();
+                _thread_notify_wait_ta_load_punchthru();
             }
         }
         else
@@ -506,15 +515,15 @@ void ta_commit_end()
     {
         if (waiting_lists & WAITING_LIST_OPAQUE)
         {
-            thread_wait_ta_load_opaque();
+            _thread_wait_ta_load_opaque();
         }
         if (waiting_lists & WAITING_LIST_TRANSPARENT)
         {
-            thread_wait_ta_load_transparent();
+            _thread_wait_ta_load_transparent();
         }
         if (waiting_lists & WAITING_LIST_PUNCHTHRU)
         {
-            thread_wait_ta_load_punchthru();
+            _thread_wait_ta_load_punchthru();
         }
     }
 
@@ -531,7 +540,7 @@ union intfloat
 extern void _video_set_ta_registers();
 
 /* Launch a new render pass */
-void _ta_begin_render(struct ta_buffers *buffers, void *scrn, float zclip)
+void _ta_begin_render(struct ta_buffers *buffers, void *scrn)
 {
     volatile unsigned int *videobase = (volatile unsigned int *)POWERVR2_BASE;
 
@@ -545,10 +554,10 @@ void _ta_begin_render(struct ta_buffers *buffers, void *scrn, float zclip)
      * polygons for. */
     _ta_create_tile_descriptors(&ta_working_buffers, global_video_width / 32, global_video_height / 32);
 
-    /* Convert the bits from float to int so we can cap off the bottom 4 bits. */
+    /* Convert the Z plane bits from float to int so we can cap off the bottom 4 bits. */
     union intfloat f2i;
-    f2i.f = zclip;
-    uint32_t zclipint = (f2i.i) & 0xFFFFFFF0;
+    f2i.f = BACKGROUND_Z_PLANE;
+    uint32_t zclip = (f2i.i) & 0xFFFFFFF0;
 
     /* Set up current render tiledescriptions, commandlist and framebuffer to render to. */
     videobase[POWERVR2_TILES_ADDR] = tls;
@@ -561,7 +570,7 @@ void _ta_begin_render(struct ta_buffers *buffers, void *scrn, float zclip)
         (1 << 24) |                // Span for the background plane vertexes? Appears to be (this number + 3) words per vertex.
         ((bgl & 0xfffffc) << 1)    // Background plane instructions pointer, we stick it at the beginning of the command buffer.
     );
-    videobase[POWERVR2_BACKGROUND_CLIP] = zclipint;
+    videobase[POWERVR2_BACKGROUND_CLIP] = zclip;
 
     /* Reset the TA registers that appear to change per-frame. */
     _video_set_ta_registers();
@@ -575,25 +584,19 @@ void _ta_begin_render(struct ta_buffers *buffers, void *scrn, float zclip)
 
 void ta_render()
 {
-    if (!_irq_is_disabled(_irq_get_sr()))
-    {
-        /* Notify thread/interrupt system that we will want to wait for the TA to finish rendering. */
-        thread_notify_wait_ta_render_finished();
-    }
-
-    /* Start rendering the new command list to the screen */
-    _ta_begin_render(&ta_working_buffers, buffer_base, BACKGROUND_Z_PLANE);
-
     if (_irq_is_disabled(_irq_get_sr()))
     {
+        /* Start rendering the new command list to the screen */
+        _ta_begin_render(&ta_working_buffers, buffer_base);
+
         /* Just spinloop waiting for the interrupt to happen. */
         while (!(HOLLY_INTERNAL_IRQ_STATUS & HOLLY_INTERNAL_INTERRUPT_TSP_RENDER_FINISHED)) { ; }
         HOLLY_INTERNAL_IRQ_STATUS = HOLLY_INTERNAL_INTERRUPT_TSP_RENDER_FINISHED;
     }
     else
     {
-        /* Now, park the thread until the renderer is finished. */
-        thread_wait_ta_render_finished();
+        /* Start rendering and park this thread until the HW is finished. */
+        _thread_ta_render(&ta_working_buffers, buffer_base);
     }
 }
 
