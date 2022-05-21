@@ -321,6 +321,9 @@ uint32_t *ta_palette_bank(int size, int banknum);
 // Given an RGBA value, return a packed color suitable for inserting into palette RAM.
 uint32_t ta_palette_entry(color_t color);
 
+// Given a packed color retrieved from palette RAM, return the RGBA value.
+color_t ta_palette_reverse_entry(uint32_t palentry);
+
 // Get a pointer to the base texture RAM that is safe to use. Note that ta_texture_malloc()
 // will allocate starting at this base so if you are going to manually lay out your texture
 // RAM do not also use ta_texture_malloc().

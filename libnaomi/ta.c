@@ -750,6 +750,22 @@ uint32_t ta_palette_entry(color_t color)
     }
 }
 
+color_t ta_palette_reverse_entry(uint32_t palentry)
+{
+    if (global_video_depth == 2)
+    {
+        color_t color;
+        EXPLODE1555(palentry, color.r, color.g, color.b, color.a);
+        return color;
+    }
+    else
+    {
+        color_t color;
+        EXPLODE8888(palentry, color.r, color.g, color.b, color.a);
+        return color;
+    }
+}
+
 void *ta_texture_base()
 {
     return ta_working_buffers.texture_ram;
