@@ -8,6 +8,8 @@ NAME = littlefs-2.5.0
 ARTIFACT = v2.5.0.tar.gz
 
 # Build arguments
+DEFINES = -DLFS_THREADSAFE
+
 BUILD_TARGET = lfs.a
 
 INSTALL_HEADERS = lfs.h lfs_util.h

@@ -9,6 +9,7 @@ build/
 libnaomi.a
 libnaomimessage.a
 libnaomisprite.a
+libnaomisramfs.a
 MANIFEST.in
 build/
 download/

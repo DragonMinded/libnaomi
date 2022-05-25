@@ -1,4 +1,4 @@
-all: hellonaomi hellocpp inputtest eepromtest audiotest netdimm rtctest threadtest debugprint carttest pvrtest spritetest advancedpvrtest
+all: hellonaomi hellocpp inputtest eepromtest audiotest netdimm rtctest threadtest debugprint carttest pvrtest spritetest advancedpvrtest sramtest
 
 .PHONY: hellonaomi
 hellonaomi:
@@ -52,8 +52,12 @@ spritetest:
 advancedpvrtest:
 	$(MAKE) -C advancedpvrtest
 
+.PHONY: sramtest
+sramtest:
+	$(MAKE) -C sramtest
+
 .PHONY: copy
-copy: hellonaomi hellocpp inputtest eepromtest audiotest netdimm rtctest threadtest debugprint carttest pvrtest spritetest advancedpvrtest
+copy: hellonaomi hellocpp inputtest eepromtest audiotest netdimm rtctest threadtest debugprint carttest pvrtest spritetest advancedpvrtest sramtest
 	cp -r hellonaomi/hellonaomi.bin ../binaries/
 	cp -r hellocpp/hellocpp.bin ../binaries/
 	cp -r inputtest/inputtest.bin ../binaries/
@@ -67,6 +71,7 @@ copy: hellonaomi hellocpp inputtest eepromtest audiotest netdimm rtctest threadt
 	cp -r pvrtest/pvrtest.bin ../binaries/
 	cp -r spritetest/spritetest.bin ../binaries/
 	cp -r advancedpvrtest/advancedpvrtest.bin ../binaries/
+	cp -r sramtest/sramtest.bin ../binaries/
 
 .PHONY: clean
 clean:
@@ -83,3 +88,4 @@ clean:
 	$(MAKE) -C pvrtest clean
 	$(MAKE) -C spritetest clean
 	$(MAKE) -C advancedpvrtest clean
+	$(MAKE) -C sramtest clean
