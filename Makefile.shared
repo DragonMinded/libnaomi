@@ -115,6 +115,9 @@ ROMFSGEN := ${VENV_PYTHON3} ${ROMFSGEN_FILE}
 MAKEROM_FILE := ${TOOLS_DIR}makerom.py
 MAKEROM := ${VENV_PYTHON3} ${MAKEROM_FILE}
 
+# Set up various toolchain utilities.
+PREFIX := ${VENV_PYTHON3} ${TOOLS_DIR}prefix.py
+
 # Set up library detection utility.
 libmissing = $(shell ${LD} -l$(1) 2>&1 | grep "cannot find" | wc -l)
 
@@ -184,6 +187,13 @@ EXTRA_DEFINES += -DFEATURE_ZLIB=1
 FEATURE_ZLIB = 1
 else
 FEATURE_ZLIB = 0
+endif
+
+ifeq ($(call libmissing,lfs), 0)
+EXTRA_DEFINES += -DFEATURE_LITTLEFS=1
+FEATURE_LITTLEFS = 1
+else
+FEATURE_LITTLEFS = 0
 endif
 
 # A trick to gather up all library dependencies so we can recompile if they change.

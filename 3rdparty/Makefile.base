@@ -82,9 +82,9 @@ else
 .PHONY: install
 install: build/build.stamp
 	mkdir -p ${NAOMI_SH_BASE}/lib
-	cd build/${NAME} ; cp ${INSTALL_LIBS} ${NAOMI_SH_BASE}/lib
+	cd build/${NAME} ; for F in ${INSTALL_LIBS} ; do cp -v "$$F" ${NAOMI_SH_BASE}/lib/`${PREFIX} --strip-dir lib $$F` ; done
 	mkdir -p ${NAOMI_SH_BASE}/include/${HEADER_INSTALLDIR}
-	cd build/${NAME} ; cp ${INSTALL_HEADERS} ${NAOMI_SH_BASE}/include/${HEADER_INSTALLDIR}
+	cd build/${NAME} ; cp -v ${INSTALL_HEADERS} ${NAOMI_SH_BASE}/include/${HEADER_INSTALLDIR}
 endif
 
 .PHONY: clean
