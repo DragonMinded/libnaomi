@@ -13,9 +13,12 @@ SRCS += main.c
 # Pick up base makefile rules common to all examples.
 include ../../Makefile.base
 
+# We need to link against this either way to use the functionality.
+LIBS += -lnaomisramfs
+
 ifeq (${FEATURE_LITTLEFS}, 1)
-# We are using the naomi SRAM FS library, so link it.
-LIBS += -lnaomisramfs -llfs
+# We are using this in the naomi SRAM FS library, so link it.
+LIBS += -llfs
 endif
 
 # Provide the top-level ROM creation target for this binary.
