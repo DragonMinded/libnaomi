@@ -18,10 +18,19 @@
 // Block size for files.
 #define SRAMFS_BLOCK_SIZE 256
 
-// Safe start address for filesystem. The Naomi BIOS messes with the first 0x1F0
+// Safe start address for filesystem. The Naomi BIOS messes with the first 0x1F8
 // bytes and expects to CRC over them. Most games use a similar storage method.
 // We forego that here. It might be worth reversing and documenting more of this
-// at some point, but for now this is good enough.
+// at some point, but for now this is good enough. For now, it looks like there
+// are 8 bytes of something, then an EEPROM CRC at 0x008 and another at 0x100.
+// Both protect sections that are 248 bytes long (including the CRC). After that,
+// it appears that games use a similar pattern to EEPROMs, where the first 4 bytes
+// at 0x1F8 are a CRC over data, then 4 bytes of data length, 4 bytes of that length
+// repeated, then 4 bytes of padding. This is repeated for the second section at 0x208,
+// followed by length bytes of game data protected by the first CRC, and then length
+// bytes of game data protected by the second CRC. We ignore all that since the BIOS
+// leaves everything at and past 0x1F8 alone, and just start at 0x200 with a block
+// size of 0x100.
 #define SRAMFS_START (SRAM_BASE + 0x200)
 #define SRAMFS_END (SRAM_BASE + SRAM_SIZE)
 
