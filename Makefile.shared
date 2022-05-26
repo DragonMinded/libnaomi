@@ -196,9 +196,8 @@ else
 FEATURE_LITTLEFS = 0
 endif
 
-# A trick to gather up all library dependencies so we can recompile if they change.
+# A helper to gather up all library dependencies so we can relink if a library changes.
 LIBDEPS_FILE := ${TOOLS_DIR}libdeps.py
-LIBDEPS := ${VENV_PYTHON3} ${LIBDEPS_FILE} ${LD} ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group
 
 # Generate header dependencies so we can include them in subsequent builds.
 DEPDIR := build
@@ -216,7 +215,7 @@ build/%.bin: build/%.elf
 build/%.elf: ${OBJS} ${TOPLEVEL_MAKEFILE}
 	@mkdir -p $(dir $@)
 	${LD} -defsym START_ADDR=${START_ADDR} -o $@ ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group
-	${LIBDEPS} | sed 's#^#$@: #' > $(@:.elf=.d)
+	${VENV_PYTHON3} ${LIBDEPS_FILE} ${LD} ${OBJS} --start-group ${LIBNAOMI} ${LIBS} ${BASELIBS} --end-group | sed 's#^#$@: #' > $(@:.elf=.d)
 
 # A rule for how to build assembly files. Depends on the build dir being created.
 # This runs the C preprocessor for convenience, so you can #define registers and
