@@ -16,10 +16,17 @@
 #ifdef FEATURE_LITTLEFS
 
 // Block size for files.
-#define BLOCK_SIZE 256
+#define SRAMFS_BLOCK_SIZE 256
 
-// Our dummy handle for file operations.
-#define SRAMFS_HANDLE (void *)8675309
+// Safe start address for filesystem. The Naomi BIOS messes with the first 0x1F0
+// bytes and expects to CRC over them. Most games use a similar storage method.
+// We forego that here. It might be worth reversing and documenting more of this
+// at some point, but for now this is good enough.
+#define SRAMFS_START (SRAM_BASE + 0x200)
+#define SRAMFS_END (SRAM_BASE + SRAM_SIZE)
+
+// Number of actual blocks in our FS.
+#define SRAMFS_BLOCKS ((SRAMFS_END - SRAMFS_START) / SRAMFS_BLOCK_SIZE)
 
 // Our mutex for thread-safe file access.
 static mutex_t sram_lock;
@@ -29,8 +36,8 @@ static lfs_t lfs;
 
 int _sram_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, void *buffer, lfs_size_t size)
 {
-    uint32_t sram_loc = SRAM_BASE + (block * c->block_size) + off;
-    if (sram_loc < SRAM_BASE || (sram_loc + size) > (SRAM_BASE + SRAM_SIZE))
+    uint32_t sram_loc = SRAMFS_START + (block * c->block_size) + off;
+    if (sram_loc < SRAMFS_START || (sram_loc + size) > SRAMFS_END)
     {
         _irq_display_invariant("sramfs failure", "tried to read outside of SRAM!");
     }
@@ -40,8 +47,8 @@ int _sram_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, voi
 
 int _sram_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, const void *buffer, lfs_size_t size)
 {
-    uint32_t sram_loc = SRAM_BASE + (block * c->block_size) + off;
-    if (sram_loc < SRAM_BASE || (sram_loc + size) > (SRAM_BASE + SRAM_SIZE))
+    uint32_t sram_loc = SRAMFS_START + (block * c->block_size) + off;
+    if (sram_loc < SRAMFS_START || (sram_loc + size) > SRAMFS_END)
     {
         _irq_display_invariant("sramfs failure", "tried to write outside of SRAM!");
     }
@@ -51,8 +58,8 @@ int _sram_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off, con
 
 int _sram_erase(const struct lfs_config *c, lfs_block_t block)
 {
-    uint32_t sram_loc = SRAM_BASE + (block * c->block_size);
-    if (sram_loc < SRAM_BASE || (sram_loc + c->block_size) > (SRAM_BASE + SRAM_SIZE))
+    uint32_t sram_loc = SRAMFS_START + (block * c->block_size);
+    if (sram_loc < SRAMFS_START || (sram_loc + c->block_size) > SRAMFS_END)
     {
         _irq_display_invariant("sramfs failure", "tried to erase outside of SRAM!");
     }
@@ -90,10 +97,10 @@ const struct lfs_config cfg = {
     // block device configuration
     .read_size = 1,
     .prog_size = 1,
-    .block_size = BLOCK_SIZE,
-    .block_count = SRAM_SIZE / BLOCK_SIZE,
+    .block_size = SRAMFS_BLOCK_SIZE,
+    .block_count = SRAMFS_BLOCKS,
     .block_cycles = -1,
-    .cache_size = BLOCK_SIZE,
+    .cache_size = SRAMFS_BLOCK_SIZE,
     .lookahead_size = 16,
 };
 
@@ -136,11 +143,6 @@ int lfs_err_to_errno(int lfs_err)
 
 void *_sramfs_open(void *fshandle, const char *name, int flags, int mode)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
     if (flags & O_DIRECTORY)
     {
         // Don't support directory listing through open/read/close.
@@ -155,22 +157,22 @@ void *_sramfs_open(void *fshandle, const char *name, int flags, int mode)
 
     // Map flags from posix to lfs.
     int actual_flags = 0;
-    if (flags & O_RDWR)
+    if ((flags & O_RDWR) == O_RDWR)
     {
         actual_flags |= LFS_O_RDWR;
     }
     else
     {
-        if (flags & O_RDONLY) { actual_flags |= LFS_O_RDONLY; }
-        if (flags & O_WRONLY) { actual_flags |= LFS_O_WRONLY; }
+        if ((flags & O_RDONLY) == O_RDONLY) { actual_flags |= LFS_O_RDONLY; }
+        if ((flags & O_WRONLY) == O_WRONLY) { actual_flags |= LFS_O_WRONLY; }
     }
-    if (flags & O_CREAT) { actual_flags |= LFS_O_CREAT; }
-    if (flags & O_APPEND) { actual_flags |= LFS_O_APPEND; }
-    if (flags & O_TRUNC) { actual_flags |= LFS_O_TRUNC; }
-    if (flags & O_EXCL) { actual_flags |= LFS_O_EXCL; }
+    if ((flags & O_CREAT) == O_CREAT) { actual_flags |= LFS_O_CREAT; }
+    if ((flags & O_APPEND) == O_APPEND) { actual_flags |= LFS_O_APPEND; }
+    if ((flags & O_TRUNC) == O_TRUNC) { actual_flags |= LFS_O_TRUNC; }
+    if ((flags & O_EXCL) == O_EXCL) { actual_flags |= LFS_O_EXCL; }
 
     // Actually attempt to open the file.
-    int err = lfs_file_open(&lfs, file, name, actual_flags);
+    int err = lfs_file_open(fshandle, file, name, actual_flags);
     if (err)
     {
         return (void *)lfs_err_to_errno(err);
@@ -181,24 +183,14 @@ void *_sramfs_open(void *fshandle, const char *name, int flags, int mode)
 
 int _sramfs_close(void *fshandle, void *file)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
-    int retval = lfs_err_to_errno(lfs_file_close(&lfs, file));
+    int retval = lfs_err_to_errno(lfs_file_close(fshandle, file));
     free(file);
     return retval;
 }
 
 int _sramfs_read(void *fshandle, void *file, void *ptr, int len)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
-    int retval = lfs_file_read(&lfs, file, ptr, len);
+    int retval = lfs_file_read(fshandle, file, ptr, len);
     if (retval >= 0)
     {
         return retval;
@@ -209,12 +201,7 @@ int _sramfs_read(void *fshandle, void *file, void *ptr, int len)
 
 int _sramfs_write(void *fshandle, void *file, const void *ptr, int len)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
-    int retval = lfs_file_write(&lfs, file, ptr, len);
+    int retval = lfs_file_write(fshandle, file, ptr, len);
     if (retval >= 0)
     {
         return retval;
@@ -225,32 +212,22 @@ int _sramfs_write(void *fshandle, void *file, const void *ptr, int len)
 
 int _sramfs_fstat(void *fshandle, void *file, struct stat *st )
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
     // libnaomi only stats open files, but lfs only returns stats on closed files.
     // So we must gather the minimum stats here.
     memset(st, 0, sizeof(struct stat));
     st->st_mode = S_IFREG;
     st->st_nlink = 1;
 
-    lfs_soff_t cur = lfs_file_tell(&lfs, file);
-    lfs_file_seek(&lfs, file, 0, LFS_SEEK_END);
-    st->st_size = lfs_file_tell(&lfs, file);
-    lfs_file_seek(&lfs, file, cur, LFS_SEEK_SET);
+    lfs_soff_t cur = lfs_file_tell(fshandle, file);
+    lfs_file_seek(fshandle, file, 0, LFS_SEEK_END);
+    st->st_size = lfs_file_tell(fshandle, file);
+    lfs_file_seek(fshandle, file, cur, LFS_SEEK_SET);
 
     return 0;
 }
 
 int _sramfs_lseek(void *fshandle, void *file, _off_t amount, int dir)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
     int whence;
     switch(dir)
     {
@@ -266,7 +243,7 @@ int _sramfs_lseek(void *fshandle, void *file, _off_t amount, int dir)
         default:
             return -EINVAL;
     }
-    lfs_soff_t off = lfs_file_seek(&lfs, file, amount, whence);
+    lfs_soff_t off = lfs_file_seek(fshandle, file, amount, whence);
     if (off >= 0)
     {
         return off;
@@ -277,49 +254,28 @@ int _sramfs_lseek(void *fshandle, void *file, _off_t amount, int dir)
 
 int _sramfs_mkdir(void *fshandle, const char *dir, int flags)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
-    return lfs_err_to_errno(lfs_mkdir(&lfs, dir));
+    return lfs_err_to_errno(lfs_mkdir(fshandle, dir));
 }
 
 int _sramfs_rename( void *fshandle, const char *oldname, const char *newname)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
-    return lfs_err_to_errno(lfs_rename(&lfs, oldname, newname));
+    return lfs_err_to_errno(lfs_rename(fshandle, oldname, newname));
 }
 
 int _sramfs_unlink( void *fshandle, const char *name)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
-    return lfs_err_to_errno(lfs_remove(&lfs, name));
+    return lfs_err_to_errno(lfs_remove(fshandle, name));
 }
 
 void *_sramfs_opendir(void *fshandle, const char *path)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
-
     lfs_dir_t *dir = malloc(sizeof(lfs_dir_t));
     if (!dir)
     {
         return (void *)-ENOMEM;
     }
 
-    int err = lfs_dir_open(&lfs, dir, path);
+    int err = lfs_dir_open(fshandle, dir, path);
     if (err)
     {
         return (void *)lfs_err_to_errno(err);
@@ -330,14 +286,9 @@ void *_sramfs_opendir(void *fshandle, const char *path)
 
 int _sramfs_readdir(void *fshandle, void *dir, struct dirent *entry)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
     // First, try to read the directory entry at all.
     struct lfs_info info;
-    int ret = lfs_dir_read(&lfs, dir, &info);
+    int ret = lfs_dir_read(fshandle, dir, &info);
     if (ret < 0)
     {
         // Errored out, return that.
@@ -375,12 +326,7 @@ int _sramfs_readdir(void *fshandle, void *dir, struct dirent *entry)
 
 int _sramfs_closedir(void *fshandle, void *dir)
 {
-    if (fshandle != SRAMFS_HANDLE)
-    {
-        _irq_display_invariant("sramfs failure", "unrecognized SRAM FS handle");
-    }
-
-    int retval = lfs_err_to_errno(lfs_dir_close(&lfs, dir));
+    int retval = lfs_err_to_errno(lfs_dir_close(fshandle, dir));
     free(dir);
     return retval;
 }
@@ -413,8 +359,11 @@ int sramfs_init(char *prefix)
     // If that failed, reformat to get a fresh SRAM.
     if (err)
     {
-        lfs_format(&lfs, &cfg);
-        err = lfs_mount(&lfs, &cfg);
+        err = lfs_format(&lfs, &cfg);
+        if (!err)
+        {
+            err = lfs_mount(&lfs, &cfg);
+        }
     }
 
     if (!err)
@@ -431,7 +380,7 @@ int sramfs_init(char *prefix)
         strcat(actual_prefix, ":/");
 
         // Attach to posix functions.
-        err = attach_filesystem(actual_prefix, &sramfs_hooks, SRAMFS_HANDLE);
+        err = attach_filesystem(actual_prefix, &sramfs_hooks, &lfs);
     }
 
     return err ? -1 : 0;

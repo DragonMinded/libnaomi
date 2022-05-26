@@ -19,21 +19,22 @@ void main()
     int boot_count = 0;
     char *boot_time = 0;
 
-    FILE *fp = fopen("sram://boot_count", "w+");
+    FILE *fp = fopen("sram://boot_count", "r+");
     if (fp)
     {
-        if (fread(&boot_count, sizeof(boot_count), 1, fp) != sizeof(boot_count))
+        if (fread(&boot_count, sizeof(boot_count), 1, fp) != 1)
         {
             boot_count = 0;
         }
 
-        fseek(fp, 0, SEEK_SET);
         boot_count++;
+
+        fseek(fp, 0, SEEK_SET);
         fwrite(&boot_count, sizeof(boot_count), 1, fp);
     }
     fclose(fp);
 
-    fp = fopen("sram://boot_time", "w+");
+    fp = fopen("sram://boot_time", "r+");
     if (fp)
     {
         fseek(fp, 0, SEEK_END);
@@ -50,11 +51,12 @@ void main()
             }
         }
 
-        fseek(fp, 0, SEEK_SET);
         time_t t = time(NULL);
         struct tm tm = *localtime(&t);
         char timebuf[1024];
         sprintf(timebuf, "%d-%02d-%02d %02d:%02d:%02d\n", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+
+        fseek(fp, 0, SEEK_SET);
         fwrite(timebuf, 1, strlen(timebuf) + 1, fp);
     }
     fclose(fp);
