@@ -24,6 +24,9 @@ void cart_write(uint32_t dst, void *src, unsigned int len);
 // into a buffer pointed at by dst.
 void cart_read_rom_header(void *dst);
 
+// Read the ROM serial number from cartridge, returning the 4 byte serial number.
+void cart_read_serial(uint8_t *serial);
+
 typedef struct
 {
     // The offset into the ROM this data section lies.

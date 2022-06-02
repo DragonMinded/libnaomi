@@ -2,6 +2,7 @@
 #include <string.h>
 #include "naomi/eeprom.h"
 #include "naomi/maple.h"
+#include "naomi/cart.h"
 
 uint32_t eeprom_crc_inner(uint32_t running_crc, uint8_t next_byte)
 {
@@ -457,7 +458,7 @@ uint8_t *eeprom_serial()
     static uint8_t serial[4];
 
     if (!initialized) {
-        memcpy(serial, &SERIAL, 4);
+        cart_read_serial(serial);
         initialized = 1;
     }
 

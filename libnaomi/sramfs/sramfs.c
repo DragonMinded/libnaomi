@@ -11,6 +11,7 @@
 #include "naomi/system.h"
 #include "naomi/thread.h"
 #include "naomi/posix.h"
+#include "naomi/cart.h"
 #include "../irqinternal.h"
 
 #ifdef FEATURE_LITTLEFS
@@ -31,8 +32,9 @@
 // bytes of game data protected by the second CRC. We ignore all that since the BIOS
 // leaves everything at and past 0x1F8 alone, and just start at 0x200 with a block
 // size of 0x100.
-#define SRAMFS_START (SRAM_BASE + 0x200)
-#define SRAMFS_END (SRAM_BASE + SRAM_SIZE)
+#define SRAMFS_FINGERPRINT ((char *)(UNCACHED_MIRROR + SRAM_BASE + 0x1FC))
+#define SRAMFS_START (UNCACHED_MIRROR + SRAM_BASE + 0x200)
+#define SRAMFS_END (UNCACHED_MIRROR + SRAM_BASE + SRAM_SIZE)
 
 // Number of actual blocks in our FS.
 #define SRAMFS_BLOCKS ((SRAMFS_END - SRAMFS_START) / SRAMFS_BLOCK_SIZE)
@@ -362,10 +364,28 @@ int sramfs_init(char *prefix)
     // Mutex for locking operations on filesystem to be thread-safe.
     mutex_init(&sram_lock);
 
-    // First, try mounting the filesystem
-    int err = lfs_mount(&lfs, &cfg);
+    // Grab the serial number we are compiled with.
+    uint8_t serial[4];
+    cart_read_serial(serial);
 
-    // If that failed, reformat to get a fresh SRAM.
+    // Verify that we have the correct serial fingerprinted in SRAM.
+    int err;
+    if (memcmp(SRAMFS_FINGERPRINT, serial, 4) == 0)
+    {
+        // First, try mounting the filesystem
+        err = lfs_mount(&lfs, &cfg);
+    }
+    else
+    {
+        // Failed to init, not for us!
+        err = 1;
+
+        // Fingerprint the SRAMFS with our serial.
+        memset((void *)SRAMFS_START, 0, SRAMFS_END - SRAMFS_START);
+        memcpy(SRAMFS_FINGERPRINT, serial, 4);
+    }
+
+    // If that failed or the serial doesn't match, reformat to get a fresh SRAM.
     if (err)
     {
         err = lfs_format(&lfs, &cfg);

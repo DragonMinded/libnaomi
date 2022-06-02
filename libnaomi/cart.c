@@ -94,6 +94,29 @@ void cart_read_rom_header(void *dst)
     irq_restore(old_irq);
 }
 
+void cart_read_serial(uint8_t *serial)
+{
+    // First, make sure the header is actually read.
+    {
+        uint32_t old_irq = irq_disable();
+
+        if (header_read == 0)
+        {
+            cart_read(header, 0, HEADER_SIZE);
+            header_read = 1;
+        }
+
+        irq_restore(old_irq);
+    }
+
+    // Now, copy out sections.
+    if (serial)
+    {
+        uint8_t *headerbytes = (uint8_t *)header;
+        memcpy(serial, &headerbytes[0x134], 4);
+    }
+}
+
 void cart_read_executable_info(executable_t *exe)
 {
     // First, make sure the header is actually read.
