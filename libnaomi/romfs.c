@@ -689,31 +689,41 @@ int romfs_init(uint32_t rom_offset, char *prefix)
 
 int romfs_init_default()
 {
-    // Find the highest section, grab the data directly after that
-    // aligned by 4 and assume that's the ROM FS.
+    // Look for a ROMFS, aligned to 4 byte boundary, at the end of every
+    // valid executable section for both main and test chunks. Normally
+    // we could just find the highest address and look there, but this
+    // means that if you attach a filesystem to a ROM, and then later
+    // patch the ROM with something like the Naomi Settings Patcher, the
+    // filesystem is no longer after the highest section anymore. So, doing
+    // the naive approach means that ROMs can't be patched after the fact.
     executable_t exe;
     cart_read_executable_info(&exe);
 
-    // Find the highest section that is loaded by the BIOS, if we
-    // were constructed correctly then the next data chunk after that
-    // aligned to 4 bytes will be our ROM FS.
-    uint32_t offset = 0;
+    // Go through each section and try to init a FS there. If it succeeds,
+    // return. If they all fail, return a failure from this function.
     for (int i = 0; i < exe.main_section_count; i++)
     {
+        // Round to nearest 4 bytes.
         uint32_t end = exe.main[i].offset + exe.main[i].length;
-        offset = offset > end ? offset : end;
+        uint32_t offset = (end + 3) & 0xFFFFFFFC;
+        if (romfs_init(offset, "rom") == 0)
+        {
+            return 0;
+        }
     }
-    for (int i = 0; i < exe.main_section_count; i++)
+    for (int i = 0; i < exe.test_section_count; i++)
     {
-        uint32_t end = exe.main[i].offset + exe.main[i].length;
-        offset = offset > end ? offset : end;
+        // Round to nearest 4 bytes.
+        uint32_t end = exe.test[i].offset + exe.test[i].length;
+        uint32_t offset = (end + 3) & 0xFFFFFFFC;
+        if (romfs_init(offset, "rom") == 0)
+        {
+            return 0;
+        }
     }
 
-    // Round to nearest 4 bytes.
-    offset = (offset + 3) & 0xFFFFFFFC;
-
-    // Now initialize it.
-    return romfs_init(offset, "rom");
+    // No ROMFS to be found.
+    return -2;
 }
 
 void romfs_free(char *prefix)
