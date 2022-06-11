@@ -19,10 +19,13 @@ SRCS += sprite1.png
 SRCS += sprite2.png
 SRCS += dejavusans.ttf
 
-LIBS += -lfreetype -lbz2 -lz -lpng16
-
 # Pick up base makefile rules common to all examples.
 include ../../Makefile.base
+
+ifeq (${FEATURE_FREETYPE}, 1)
+# Libraries that we want to link against.
+LIBS += -lfreetype -lbz2 -lz -lpng16
+endif
 
 # Specific buildrule for PNG files for this project.
 build/sprite2.o: sprite2.png ${IMG2C_FILE}

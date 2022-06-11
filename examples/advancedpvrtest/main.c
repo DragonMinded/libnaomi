@@ -84,6 +84,7 @@ void main()
     tex[6] = ta_texture_desc_malloc_paletted(256, sprite1_png_data, TA_PALETTE_CLUT8, 0);
     tex[7] = ta_texture_desc_malloc_direct(256, sprite2_png_data, TA_TEXTUREMODE_ARGB4444);
 
+#ifdef FEATURE_FREETYPE
     /* Set up our font. */
     extern uint8_t *dejavusans_ttf_data;
     extern unsigned int dejavusans_ttf_len;
@@ -91,6 +92,7 @@ void main()
     font_set_size(font_18pt, 18);
     font_t *font_12pt = font_add(dejavusans_ttf_data, dejavusans_ttf_len);
     font_set_size(font_12pt, 12);
+#endif
 
     /* x/y/z rotation amount in degrees */
     int i = 45;
@@ -227,9 +229,11 @@ void main()
         };
         ta_fill_box(TA_CMD_POLYGON_TYPE_TRANSPARENT, covered_box, rgba(0, 255, 255, 100));
 
+#ifdef FEATURE_FREETYPE
         /* Now, draw some font text. */
         ta_draw_text(32, 85, font_18pt, rgb(255, 255, 255), "Hello, world!");
         ta_draw_text(32, 105, font_12pt, rgb(0, 255, 244), "Hello, world!");
+#endif
 
         /* Mark the end of the command list */
         ta_commit_end();
@@ -237,12 +241,20 @@ void main()
         /* Now, request to render it */
         ta_render();
 
+#ifdef FEATURE_FREETYPE
         /* Now, draw some font text. */
         video_draw_text(32, 45, font_18pt, rgb(255, 255, 255), "Hello, world!");
         video_draw_text(32, 65, font_12pt, rgb(0, 255, 244), "Hello, world!");
+#endif
 
         /* Now, display some debugging on top of the TA. */
         video_draw_debug_text(32, 32, rgb(255, 255, 255), "Rendering with TA...\nLiveness counter: %d", count++);
+
+#ifndef FEATURE_FREETYPE
+        video_draw_debug_text(32, 48, rgb(255, 0, 0), "Font rendering missing due to missing freetype library!");
+        video_draw_debug_text(32, 56, rgb(255, 0, 0), "Compile 3rd party libs and then recompile libnaomi.");
+#endif
+
         video_display_on_vblank();
     }
 }
