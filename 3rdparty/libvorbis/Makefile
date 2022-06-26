@@ -14,7 +14,7 @@ CONFIGURE_ARGS = --host=sh-elf --enable-static
 
 BUILD_TARGET = all
 
-INSTALL_LIBS = lib/.libs/libvorbis.a
+INSTALL_LIBS = lib/.libs/libvorbis.a lib/.libs/libvorbisfile.a
 
 INSTALL_HEADERS = include/vorbis/codec.h include/vorbis/vorbisenc.h include/vorbis/vorbisfile.h
 
