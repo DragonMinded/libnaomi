@@ -1,4 +1,4 @@
-all: zlib libbz2 libpng freetype libjpeg libxmp libtimidity littlefs libogg libvorbis
+all: zlib libbz2 libpng freetype libjpeg libxmp libtimidity littlefs libogg libvorbis libmpg123
 
 .PHONY: zlib
 zlib:
@@ -40,7 +40,11 @@ libogg:
 libvorbis:
 	$(MAKE) -C libvorbis
 
-install: install-zlib install-libbz2 install-libpng install-freetype install-libjpeg install-libxmp install-libtimidity install-littlefs install-libogg install-libvorbis
+.PHONY: libmpg123
+libmpg123:
+	$(MAKE) -C libmpg123
+
+install: install-zlib install-libbz2 install-libpng install-freetype install-libjpeg install-libxmp install-libtimidity install-littlefs install-libogg install-libvorbis install-libmpg123
 
 .PHONY: install-zlib
 install-zlib:
@@ -82,6 +86,10 @@ install-libogg:
 install-libvorbis:
 	$(MAKE) -C libvorbis install
 
+.PHONY: install-libmpg123
+install-libmpg123:
+	$(MAKE) -C libmpg123 install
+
 .PHONY: clean
 clean:
 	$(MAKE) -C zlib clean
@@ -93,7 +101,8 @@ clean:
 	$(MAKE) -C libtimidity clean
 	$(MAKE) -C littlefs clean
 	$(MAKE) -C libogg clean
-	$(MAKE) -C libogg clean
+	$(MAKE) -C libvorbis clean
+	$(MAKE) -C libmpg123 clean
 
 .PHONY: allclean
 allclean:
@@ -107,3 +116,4 @@ allclean:
 	$(MAKE) -C littlefs allclean
 	$(MAKE) -C libogg allclean
 	$(MAKE) -C libvorbis allclean
+	$(MAKE) -C libmpg123 allclean
