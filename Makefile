@@ -1,4 +1,4 @@
-all: pyenv libnaomi libnaomimessage libnaomisprite libnaomisramfs examples tests
+all: pyenv libnaomi libnaomimessage libnaomisprite libnaomisramfs libnaomitmpfs examples tests
 
 ${NAOMI_BASE}/tools/pyenv:
 	mkdir -p ${NAOMI_BASE}/tools
@@ -24,16 +24,20 @@ libnaomisprite:
 libnaomisramfs:
 	$(MAKE) -C libnaomi/sramfs
 
+.PHONY: libnaomitmpfs
+libnaomitmpfs:
+	$(MAKE) -C libnaomi/tmpfs
+
 .PHONY: examples
-examples: libnaomi libnaomimessage libnaomisprite libnaomisramfs
+examples: libnaomi libnaomimessage libnaomisprite libnaomisramfs libnaomitmpfs
 	$(MAKE) -C examples
 
 .PHONY: tests
-tests: libnaomi libnaomimessage libnaomisprite libnaomisramfs
+tests: libnaomi libnaomimessage libnaomisprite libnaomisramfs libnaomitmpfs
 	$(MAKE) -C tests
 
 .PHONY: copy
-copy: libnaomi libnaomimessage libnaomisprite libnaomisramfs examples
+copy: libnaomi libnaomimessage libnaomisprite libnaomisramfs libnaomitmpfs examples
 	$(MAKE) -C examples copy
 
 .PHONY: wipe-install-venv
@@ -44,11 +48,12 @@ wipe-install-venv:
 	${NAOMI_BASE}/tools/pyenv/bin/python3 -m pip install wheel pillow naomiutils netdimmutils
 
 .PHONY: install
-install: libnaomi libnaomimessage libnaomisprite libnaomisramfs wipe-install-venv
+install: libnaomi libnaomimessage libnaomisprite libnaomisramfs libnaomitmpfs wipe-install-venv
 	$(MAKE) -C libnaomi install
 	$(MAKE) -C libnaomi/message install
 	$(MAKE) -C libnaomi/sprite install
 	$(MAKE) -C libnaomi/sramfs install
+	$(MAKE) -C libnaomi/tmpfs install
 	mkdir -p ${NAOMI_BASE}/tools
 	cp naomi.ld ${NAOMI_BASE}/tools
 	cp aica.ld ${NAOMI_BASE}/tools
@@ -62,5 +67,6 @@ clean:
 	$(MAKE) -C libnaomi/message clean
 	$(MAKE) -C libnaomi/sprite clean
 	$(MAKE) -C libnaomi/sramfs clean
+	$(MAKE) -C libnaomi/tmpfs clean
 	$(MAKE) -C examples clean
 	$(MAKE) -C tests clean
