@@ -390,7 +390,11 @@ int tmpfs_init(char *prefix, void *location, unsigned int size)
     if (location == NULL)
     {
         location = malloc(size);
-        context->owned = location;
+        if (location)
+        {
+            memset(location, 0, size);
+            context->owned = location;
+        }
     }
     if (location == NULL)
     {
