@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 import argparse
+import hashlib
 import os
 import os.path
 import struct
@@ -28,6 +29,9 @@ def make_directory(directory: str, parent: Optional[int], parententries: Optiona
     fnames = list(os.listdir(directory))
     headerlen = (len(fnames) + 2) * 256
 
+    # Keep a cache of in-directory identical files for smaller ROM sizes.
+    sumlocs: Dict[str, Tuple[int, int, str]] = {}
+
     # Now, start the header structure itself.
     files: Dict[str, Entry] = {
         # Pointer to self entry.
@@ -48,19 +52,31 @@ def make_directory(directory: str, parent: Optional[int], parententries: Optiona
             with open(path, "rb") as bfp:
                 filedata = bfp.read()
 
+            # Hash it so we can dedup data in ROMFS.
+            h = hashlib.md5(filedata).hexdigest()
             filelen = len(filedata)
-            origlen = filelen
 
-            # Pad to 4-byte boundary. We only need two but whatever.
-            while filelen % 4 != 0:
-                filedata += b"\0"
-                filelen += 1
+            if h in sumlocs and sumlocs[h][0] == filelen:
+                origlen, actualspot, origname = sumlocs[h]
 
-            # Add it to the entries, add the data to the actual data.
-            print(f"Added {fname} to ROM FS!")
-            files[fname] = Entry(headerlen + datalen, ROMFS_TYPE_FILE, origlen)
-            data += filedata
-            datalen += filelen
+                # Add it to the entries, add the data to the actual data.
+                print(f"Added {fname} to ROM FS linked to {origname}!")
+                files[fname] = Entry(headerlen + actualspot, ROMFS_TYPE_FILE, origlen)
+            else:
+                origlen = filelen
+
+                # Pad to 4-byte boundary. We only need two but whatever.
+                while filelen % 4 != 0:
+                    filedata += b"\0"
+                    filelen += 1
+
+                # Add it to the entries, add the data to the actual data.
+                print(f"Added {fname} to ROM FS!")
+                files[fname] = Entry(headerlen + datalen, ROMFS_TYPE_FILE, origlen)
+                sumlocs[h] = (origlen, datalen, fname)
+
+                data += filedata
+                datalen += filelen
         elif os.path.isdir(path):
             # Directory. Make the directory and link it back to ourselves.
             numentries, dirdata = make_directory(path, -(headerlen + datalen), len(fnames) + 2)
