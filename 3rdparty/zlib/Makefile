@@ -3,7 +3,7 @@ all: build
 # Download arguments
 BASE_URL = http://zlib.net/
 
-NAME = zlib-1.2.12
+NAME = zlib-1.2.13
 
 ARTIFACT = ${NAME}.tar.gz
 
