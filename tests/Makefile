@@ -27,6 +27,7 @@ endif
 
 # Provide a rule to build our ROM FS.
 build/romfs.bin: romfs/ ${ROMFSGEN_FILE}
+	@mkdir -p romfs/empty_dir
 	${ROMFSGEN} $@ $<
 
 # Auto-find test cases and add them to the binary.
