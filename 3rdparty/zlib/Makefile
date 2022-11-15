@@ -1,7 +1,7 @@
 all: build
 
 # Download arguments
-BASE_URL = http://zlib.net/
+BASE_URL = http://zlib.net/fossils/
 
 NAME = zlib-1.2.13
 
