@@ -335,6 +335,25 @@ int ta_texture_load(void *offset, int uvsize, int bitsize, void *data)
 
     switch (bitsize)
     {
+        case 4:
+        {
+            uint16_t *tex = (uint16_t *)(((uint32_t)offset) | UNCACHED_MIRROR);
+            uint8_t *src = (uint8_t *)data;
+
+            for(int v = 0; v < uvsize; v+= 2)
+            {
+                for(int u = 0; u < uvsize; u+= 2)
+                {
+                    tex[TWIDDLE(u, v) >> 2] = (
+                        ((src[(u + (v * uvsize)) >> 1] >> 4) & 0x000F) |
+                        (src[(u + ((v + 1) * uvsize)) >> 1] & 0x00F0) |
+                        ((src[((u + 1) + (v * uvsize)) >> 1] << 8) & 0x0F00) |
+                        ((src[((u + 1) + ((v + 1) * uvsize)) >> 1] << 12) & 0xF000)
+                    );
+                }
+            }
+            break;
+        }
         case 8:
         {
             uint16_t *tex = (uint16_t *)(((uint32_t)offset) | UNCACHED_MIRROR);
@@ -365,7 +384,7 @@ int ta_texture_load(void *offset, int uvsize, int bitsize, void *data)
         }
         default:
         {
-            // Currently only support loading 8/16bit textures here.
+            // Currently only support loading 4/8/16bit textures here.
             return -1;
         }
     }
@@ -441,6 +460,25 @@ int ta_texture_load_sprite(void *offset, int uvsize, int bitsize, int x, int y, 
 
     switch (bitsize)
     {
+        case 4:
+        {
+            uint16_t *tex = (uint16_t *)(((uint32_t)offset) | UNCACHED_MIRROR);
+            uint8_t *src = (uint8_t *)data;
+
+            for(int v = ys; v < height; v+= 2)
+            {
+                for(int u = xs; u < width; u+= 2)
+                {
+                    tex[TWIDDLE((u + x), (v + y)) >> 2] = (
+                        ((src[(u + (v * origwidth)) >> 1] >> 4) & 0x000F) |
+                        (src[(u + ((v + 1) * origwidth)) >> 1] & 0x00F0) |
+                        ((src[((u + 1) + (v * origwidth)) >> 1] << 8) & 0x0F00) |
+                        ((src[((u + 1) + ((v + 1) * origwidth)) >> 1] << 12) & 0xF000)
+                    );
+                }
+            }
+            break;
+        }
         case 8:
         {
             uint16_t *tex = (uint16_t *)(((uint32_t)offset) | UNCACHED_MIRROR);
@@ -471,7 +509,7 @@ int ta_texture_load_sprite(void *offset, int uvsize, int bitsize, int x, int y, 
         }
         default:
         {
-            // Currently only support loading 8/16bit textures here.
+            // Currently only support loading 4/8/16bit textures here.
             return -1;
         }
     }

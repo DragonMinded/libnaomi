@@ -18,11 +18,15 @@
 
 void init_palette()
 {
-    uint32_t *palette[4] = {
+    uint32_t *palette[5] = {
         ta_palette_bank(TA_PALETTE_CLUT8, 0),
         ta_palette_bank(TA_PALETTE_CLUT8, 1),
         ta_palette_bank(TA_PALETTE_CLUT8, 2),
-        ta_palette_bank(TA_PALETTE_CLUT8, 3),
+        // We are mixing 8bpp and 4bpp palettes, so we need to skip past the above palettes. In 4bpp
+        // mode, we can fit 16 palettes into the same slot that a single 8bpp palette would fit. So,
+        // we start at palette 48 (16 * 3).
+        ta_palette_bank(TA_PALETTE_CLUT4, 48),
+        ta_palette_bank(TA_PALETTE_CLUT4, 49),
     };
 
     for(int n = 0; n < 256; n++)
@@ -35,9 +39,18 @@ void init_palette()
 
         // Purple
         palette[2][n] = ta_palette_entry(rgb(n, n > WHITE_THRESHOLD ? n : 0, n));
+    }
+
+    for(int x = 0; x < 16; x++)
+    {
+        // Make an 8-bit color since rgb() needs this.
+        int n = (x << 4) | (x);
 
         // Yellow
-        palette[3][n] = ta_palette_entry(rgb(n, n, n > WHITE_THRESHOLD ? n : 0));
+        palette[3][x] = ta_palette_entry(rgb(n, n, n > WHITE_THRESHOLD ? n : 0));
+
+        // Cyan
+        palette[4][x] = ta_palette_entry(rgb(n > WHITE_THRESHOLD ? n : 0, n, n));
     }
 }
 
@@ -77,10 +90,10 @@ void main()
     tex[0] = ta_texture_desc_malloc_paletted(256, tex1_png_data, TA_PALETTE_CLUT8, 0);
     tex[1] = ta_texture_desc_malloc_paletted(256, tex2_png_data, TA_PALETTE_CLUT8, 1);
     tex[2] = ta_texture_desc_malloc_paletted(256, tex3_png_data, TA_PALETTE_CLUT8, 2);
-    tex[3] = ta_texture_desc_malloc_paletted(256, tex4_png_data, TA_PALETTE_CLUT8, 3);
+    tex[3] = ta_texture_desc_malloc_paletted(256, tex4_png_data, TA_PALETTE_CLUT4, 48);
     tex[4] = ta_texture_desc_malloc_paletted(256, tex5_png_data, TA_PALETTE_CLUT8, 1);
     tex[5] = ta_texture_desc_malloc_paletted(256, tex6_png_data, TA_PALETTE_CLUT8, 2);
-    tex[6] = ta_texture_desc_malloc_paletted(256, sprite1_png_data, TA_PALETTE_CLUT8, 0);
+    tex[6] = ta_texture_desc_malloc_paletted(256, sprite1_png_data, TA_PALETTE_CLUT4, 49);
 
     /* x/y/z rotation amount in degrees */
     int i = 45;

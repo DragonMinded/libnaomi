@@ -21,9 +21,39 @@ SRCS += sprite1.png
 include ../../Makefile.base
 
 # Specific buildrule for PNG files for this project.
-build/%.o: %.png ${IMG2C_FILE}
+build/tex1.o: tex1.png ${IMG2C_FILE}
 	@mkdir -p $(dir $@)
 	${IMG2C} build/$<.c --mode INTENSITY8 $<
+	${CC} -c build/$<.c -o $@
+
+build/tex2.o: tex2.png ${IMG2C_FILE}
+	@mkdir -p $(dir $@)
+	${IMG2C} build/$<.c --mode INTENSITY8 $<
+	${CC} -c build/$<.c -o $@
+
+build/tex3.o: tex3.png ${IMG2C_FILE}
+	@mkdir -p $(dir $@)
+	${IMG2C} build/$<.c --mode INTENSITY8 $<
+	${CC} -c build/$<.c -o $@
+
+build/tex4.o: tex4.png ${IMG2C_FILE}
+	@mkdir -p $(dir $@)
+	${IMG2C} build/$<.c --mode INTENSITY4 $<
+	${CC} -c build/$<.c -o $@
+
+build/tex5.o: tex5.png ${IMG2C_FILE}
+	@mkdir -p $(dir $@)
+	${IMG2C} build/$<.c --mode INTENSITY8 $<
+	${CC} -c build/$<.c -o $@
+
+build/tex6.o: tex6.png ${IMG2C_FILE}
+	@mkdir -p $(dir $@)
+	${IMG2C} build/$<.c --mode INTENSITY8 $<
+	${CC} -c build/$<.c -o $@
+
+build/sprite1.o: sprite1.png ${IMG2C_FILE}
+	@mkdir -p $(dir $@)
+	${IMG2C} build/$<.c --mode INTENSITY4 $<
 	${CC} -c build/$<.c -o $@
 
 # Provide the top-level ROM creation target for this binary.
