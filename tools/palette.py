@@ -105,7 +105,7 @@ def parse_gpl_pal(input: UnparsedPaletteData) -> ParsedPaletteData:
                     nameSplit = line.split(":")
                     output.palette_name = nameSplit[-1]
                     continue
-                # Color count seems to be part of spec? Haven't seen an example without it
+                # Color count is common, but not guaranteed as part of spec
                 if line.lower().find("colors:") != -1:
                     color_countSplit = line.split(":")
                     output.color_count = int(color_countSplit[-1])
@@ -123,10 +123,6 @@ def parse_gpl_pal(input: UnparsedPaletteData) -> ParsedPaletteData:
                 if index == 2:
                     output.color_count = int(line)
                     continue
-
-            # Validate color count is either 16 or 256
-            if output.color_count != 16 and output.color_count != 256:
-                raise Exception(f"ERROR: Parsed color count does not align with supported NAOMI palette sizes! {output.color_count} != 16 or 256")
             
             columns = line.split()
             if len(columns) >= 3:
@@ -141,6 +137,10 @@ def parse_gpl_pal(input: UnparsedPaletteData) -> ParsedPaletteData:
         raise Exception(f"ERROR: Parsed color count does not match file declaration! {len(output.palette_colors)} != {output.color_count}")
     elif output.color_count == -1:
         output.color_count = len(output.palette_colors)
+
+    # Validate color count is either 16 or 256
+    if output.color_count != 16 and output.color_count != 256:
+        raise Exception(f"ERROR: Parsed color count does not align with supported NAOMI palette sizes! {output.color_count} != 16 or 256")
 
     output.raw_source = "".join(lines)
 
@@ -300,7 +300,7 @@ def parse_ase(input: UnparsedPaletteData) -> ParsedPaletteData:
             # Handle different chunk types
             if ch_type == 0xC001:
                 ch_name_raw = struct.unpack(f">{ch_name_length}H", ase[ch_offset:ch_offset + (ch_name_length*2)])
-                ch_name = ''.join(chr(n) for n in ch_name_raw).strip()
+                ch_name = ''.join(chr(n) for n in ch_name_raw).strip().rstrip('\x00')
                 ch_offset += (ch_name_length*2)
 
                 # print(f"GROUP START ({ch_size}B) Name ({ch_name_length}B): {ch_name}")
@@ -312,7 +312,7 @@ def parse_ase(input: UnparsedPaletteData) -> ParsedPaletteData:
                 # Parse the name block for this color
                 # It's null-terminated, so the name_length will report 1 extra character
                 ch_name_raw = struct.unpack(f">{ch_name_length}H", ase[ch_offset:ch_offset + (ch_name_length*2)])
-                ch_name = ''.join(chr(n) for n in ch_name_raw).strip()
+                ch_name = ''.join(chr(n) for n in ch_name_raw).strip().rstrip('\x00')
                 ch_offset += (ch_name_length*2)
 
                 # Color mode
