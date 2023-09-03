@@ -177,7 +177,7 @@ CODEOBJS = $(patsubst %.cpp, build/%.o, $(patsubst %.s, build/%.o, $(patsubst %.
 RAWOBJS = $(patsubst %.raw, build/%.o, ${CODEOBJS})
 FONTOBJS = $(patsubst %.ttf, build/%.o, ${RAWOBJS})
 IMGOBJS = $(patsubst %.jpg, build/%.o, $(patsubst %.png, build/%.o, ${FONTOBJS}))
-PALOBJS = $(patsubst %.gpl, build/%.o, $(patsubst %.pal, build/%.o, $(patsubst %.ase, build/%.o, $(patsubst %.aco, build/%.o, ${IMGOBJS}))))
+PALOBJS = $(patsubst %.gpl, build/%.o, $(patsubst %.pal, build/%.o, $(patsubst %.ase, build/%.o, $(patsubst %.aco, build/%.o, $(patsubst %.txt, build/%.o, ${IMGOBJS})))))
 OBJS = ${PALOBJS}
 
 # Any extra defines we want available to all homebrew programs.
