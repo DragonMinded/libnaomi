@@ -13,16 +13,13 @@ from enum import Enum
 # Tool converts a palette file of supported type into a .c file that defines the palette as a uint32_t array.
 # This can then be memcpy'd into a TA palette bank directly
 
-# Declare enum to contain supported file types
 PaletteType = Enum('PaletteType', ['Unknown', 'GPL', 'PAL', 'PNG', 'ASE', 'ACO', 'TXT'])
 
-# Helper function to identify which Palette Types are plaintext formats
 def is_type_plaintext(input: PaletteType) -> bool:
     if input == PaletteType.GPL or input == PaletteType.PAL or input == PaletteType.TXT:
         return True
     return False
 
-# Helper function to identify which Palette Types are printable binary formats
 def is_type_printable_bin(input: PaletteType) -> bool:
     if input == PaletteType.ASE or input == PaletteType.ACO:
         return True
@@ -76,7 +73,6 @@ class ParsedPaletteData:
 
 # Parse a .GPL or .PAL file and return colors in the form of separated r,g,b values.
 # Add alpha value based on the specified transparent index (or default index 0).
-# Returns an array of arrays, with each entry of the form [[r,g,b,a]]
 def parse_gpl_pal(input: UnparsedPaletteData) -> ParsedPaletteData:
     output = ParsedPaletteData()
     output.palette_type = input.palette_type
@@ -147,7 +143,6 @@ def parse_gpl_pal(input: UnparsedPaletteData) -> ParsedPaletteData:
     return output
 
 # Parse a .TXT palette file and return colors in the form of r,g,b,a values.
-# Returns an array of arrays, with each entry of the form [[r,g,b,a]]
 # Format spec seems to be: https://www.getpaint.net/doc/latest/WorkingWithPalettes.html
 def parse_txt(input: UnparsedPaletteData) -> ParsedPaletteData:
     output = ParsedPaletteData()
@@ -195,8 +190,7 @@ def parse_txt(input: UnparsedPaletteData) -> ParsedPaletteData:
     return output
 
 # Parse a .PNG file and return return colors in the form of r,g,b,a values.
-# Processes the first n pixels of the PNG.
-# Returns an array of arrays, with each entry of the form [[r,g,b,a]]
+# Processes the first 16 or 256 pixels of the PNG.
 def parse_png(input: UnparsedPaletteData) -> ParsedPaletteData:
     output = ParsedPaletteData()
     output.palette_type = input.palette_type
@@ -247,7 +241,6 @@ def append_col_alpha_index(input: UnparsedPaletteData, output: ParsedPaletteData
 
 # Parse a .ASE file and return colors in the form of separated r,g,b values.
 # Add alpha value based on the specified transparent index (or default index 0).
-# Returns an array of arrays, with each entry of the form [[r,g,b,a]]
 
 # As currently designed, this will only import the first 16 or 256 colors in the
 # ASE file, and will ignore any ASE "groups" and color names.
@@ -374,7 +367,6 @@ def parse_ase(input: UnparsedPaletteData) -> ParsedPaletteData:
 
 # Parse a .ACO file and return colors in the form of separated r,g,b values.
 # Add alpha value based on the specified transparent index (or default index 0).
-# Returns an array of arrays, with each entry of the form [[r,g,b,a]]
 
 # ACO spec was published by Adobe: 
 # https://www.adobe.com/devnet-apps/photoshop/fileformatashtml/#50577411_pgfId-1055819
