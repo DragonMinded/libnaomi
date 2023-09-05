@@ -15,6 +15,8 @@ from enum import Enum
 
 PaletteType = Enum('PaletteType', ['Unknown', 'GPL', 'PAL', 'PNG', 'ASE', 'ACO', 'TXT'])
 
+palette_resize_fill_color = [255, 0, 255, 255]
+
 def is_type_plaintext(input: PaletteType) -> bool:
     if input == PaletteType.GPL or input == PaletteType.PAL or input == PaletteType.TXT:
         return True
@@ -30,12 +32,12 @@ class UnparsedPaletteData:
     palette_type = PaletteType.Unknown
     args = None
 
-    def __init__(self,ar):
+    def __init__(self,ar) -> None:
         self.args = ar
         self.determine_type()
 
     # Automatically determine the type of file, unless a specific type has been specified.
-    def determine_type(self):
+    def determine_type(self) -> None:
         file_name, file_extension = os.path.splitext(self.args.palette)
         file_extension = file_extension.strip(",.-_")
         for pt in PaletteType:
@@ -66,10 +68,44 @@ class ParsedPaletteData:
     raw_source = ""
 
     # Print the parsed palette data (EG: for debug print etc.)
-    def __str__(self):
+    def __str__(self) -> None:
         nl = '\n'
         strpc = [str(pc) for pc in self.palette_colors]
         return f"Name: {self.palette_name}{nl}Colors: {self.color_count}{nl}{nl.join(strpc)}"
+
+def validate_and_resize_palette(input: UnparsedPaletteData, output: ParsedPaletteData) -> None:
+    # Validate size is either 16 or 256
+    # If there are more than 256 colors and TRIM mode is enabled, trim the output to 256
+    # Otherwise, throw an exception
+    if output.color_count > 256:
+        if input.args.resize.lower() == 'trim':
+            print(f"WARNING: Palette contained {output.color_count} entries. It is being trimmed to 256 colors.")
+            del output.palette_colors[256:]
+            output.color_count = 256
+        else:
+            raise Exception(f"ERROR: Parsed color count is greater than 256 colors! {output.color_count} > 256")
+    
+    # If TRIM resize mode is enabled, trim the output palette if it is between 16 and 256 colors
+    if input.args.resize.lower() == 'trim' and output.color_count > 16 and output.color_count < 256:
+        print(f"WARNING: Palette contained {output.color_count} entries. It is being trimmed to 16 colors.")
+        del output.palette_colors[16:]
+        output.color_count = 16
+        return None
+
+    # Expand to reach those sizes if it is smaller
+    if output.color_count != 16 and output.color_count != 256:
+        fill_count = 0
+        if output.color_count < 16:
+            print(f"WARNING: Palette contained only {output.color_count} entries. It is being expanded to 16 colors.")
+            fill_count = 16 - output.color_count
+        else:
+            print(f"WARNING: Palette contained only {output.color_count} entries. It is being expanded to 256 colors.")
+            fill_count = 256 - output.color_count
+    
+        for c in range(fill_count):
+            output.palette_colors.append(palette_resize_fill_color)
+        
+        output.color_count = len(output.palette_colors)
 
 # Parse a .GPL or .PAL file and return colors in the form of separated r,g,b values.
 # Add alpha value based on the specified transparent index (or default index 0).
@@ -134,9 +170,7 @@ def parse_gpl_pal(input: UnparsedPaletteData) -> ParsedPaletteData:
     elif output.color_count == -1:
         output.color_count = len(output.palette_colors)
 
-    # Validate color count is either 16 or 256
-    if output.color_count != 16 and output.color_count != 256:
-        raise Exception(f"ERROR: Parsed color count does not align with supported NAOMI palette sizes! {output.color_count} != 16 or 256")
+    validate_and_resize_palette(input, output)
 
     output.raw_source = "".join(lines)
 
@@ -185,6 +219,8 @@ def parse_txt(input: UnparsedPaletteData) -> ParsedPaletteData:
     if output.color_count == -1:
         output.color_count = len(output.palette_colors)
 
+    validate_and_resize_palette(input, output)
+
     output.raw_source = "".join(lines)
 
     return output
@@ -201,14 +237,10 @@ def parse_png(input: UnparsedPaletteData) -> ParsedPaletteData:
     texture = Image.open(io.BytesIO(data))
     width, height = texture.size
 
-    # Determine the number of pixels to encode as a palette
-    # Automatically take the larger possible size if possible
     pix_count = width * height
-    if pix_count < 16:
-        raise Exception(f"ERROR: PNG pixel count is smaller than minimum NAOMI palette size! {width * height} < 16")
-    elif pix_count >= 16 and pix_count < 256:
-        pix_count = 16
-    else:
+    
+    if pix_count > 256:
+        print(f"WARNING: PNG contained {pix_count} pixels. Only the first 256 will be sampled for color entries.")
         pix_count = 256
 
     output.color_count = pix_count
@@ -220,12 +252,14 @@ def parse_png(input: UnparsedPaletteData) -> ParsedPaletteData:
         # pixdata is [r, g, b, a]
         output.palette_colors.append([pixdata[0], pixdata[1], pixdata[2], pixdata[3]])
 
+    validate_and_resize_palette(input, output)
+
     return output
 
 
 # Append a color to the palette_colors list and address alpha if needed
 # Used by both parse_ase() and parse_aco()
-def append_col_alpha_index(input: UnparsedPaletteData, output: ParsedPaletteData, col):
+def append_col_alpha_index(input: UnparsedPaletteData, output: ParsedPaletteData, col) -> None:
     # Initialize the output color count if it's still in the "undefined" state
     if output.color_count == -1:
         output.color_count = 0
@@ -363,6 +397,8 @@ def parse_ase(input: UnparsedPaletteData) -> ParsedPaletteData:
         
         output.raw_source = '\n'.join(parsed_src)
 
+    validate_and_resize_palette(input, output)
+
     return output
 
 # Parse a .ACO file and return colors in the form of separated r,g,b values.
@@ -467,6 +503,8 @@ def parse_aco(input: UnparsedPaletteData) -> ParsedPaletteData:
 
         output.raw_source = '\n'.join(parsed_src)
 
+    validate_and_resize_palette(input, output)
+
     return output
 
 
@@ -543,7 +581,21 @@ def main() -> int:
         help=( 
             'The index of the transparent color in the palette. GPL, PAL, ASE, and ACO palettes do not record transparency,'
             'so this must be passed as an option when converting. Default is 0 if not specified.'
-            'A value < 0 or > palette color count will result in fully opaque output.'
+            'A value less than 0 or greater than palette color count will result in fully opaque output.'
+        )
+    )
+    parser.add_argument(
+        '--resize',
+        nargs='?',
+        const='EXPAND',
+        default='EXPAND',
+        metavar='RESIZE',
+        type=str,
+        help=(
+            'An optional parameter to change the resize technique. Options are TRIM or EXPAND; default is EXPAND.'
+            'Determines the behavior when a palette is parsed that does not match NAOMI palette sizes (16 or 256 colors).'
+            'EXPAND will increase palette size to the next available size that is supported, filling the new slots with an obvious key color.'
+            'TRIM will expand palettes that are less than 16 colors, but discard extra colors between 16 and 256.'
         )
     )
     args = parser.parse_args()
