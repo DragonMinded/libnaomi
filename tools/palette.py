@@ -68,7 +68,7 @@ class ParsedPaletteData:
     raw_source = ""
 
     # Print the parsed palette data (EG: for debug print etc.)
-    def __str__(self) -> None:
+    def __str__(self) -> str:
         nl = '\n'
         strpc = [str(pc) for pc in self.palette_colors]
         return f"Name: {self.palette_name}{nl}Colors: {self.color_count}{nl}{nl.join(strpc)}"
