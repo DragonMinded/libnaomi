@@ -104,6 +104,12 @@ IMG2BIN_FILE := ${TOOLS_DIR}sprite.py
 IMG2BIN := ${VENV_PYTHON3} ${IMG2BIN_FILE} --raw
 
 # Set up various toolchain utilities.
+PAL2C_FILE := ${TOOLS_DIR}palette.py
+PAL2C := ${VENV_PYTHON3} ${PAL2C_FILE}
+PAL2BIN_FILE := ${TOOLS_DIR}palette.py
+PAL2BIN := ${VENV_PYTHON3} ${PAL2BIN_FILE} --raw
+
+# Set up various toolchain utilities.
 PITCHGEN_FILE := ${TOOLS_DIR}pitchgen.py
 PITCHGEN := ${VENV_PYTHON3} ${PITCHGEN_FILE}
 
@@ -165,11 +171,14 @@ TEST_ADDR = $(shell ${ADDR} ${START_ADDR} 4)
 
 # Auto-compute objects based on sources we recognize. The rest of the sources will
 # be assumed to be objects that we want to include.
+# Note that .png files can also be interpreted as palettes, but must be manually
+# specified as such; the default interpretation is as sprite data.
 CODEOBJS = $(patsubst %.cpp, build/%.o, $(patsubst %.s, build/%.o, $(patsubst %.c, build/%.o, ${SRCS})))
 RAWOBJS = $(patsubst %.raw, build/%.o, ${CODEOBJS})
 FONTOBJS = $(patsubst %.ttf, build/%.o, ${RAWOBJS})
 IMGOBJS = $(patsubst %.jpg, build/%.o, $(patsubst %.png, build/%.o, ${FONTOBJS}))
-OBJS = ${IMGOBJS}
+PALOBJS = $(patsubst %.gpl, build/%.o, $(patsubst %.pal, build/%.o, $(patsubst %.ase, build/%.o, $(patsubst %.aco, build/%.o, $(patsubst %.txt, build/%.o, ${IMGOBJS})))))
+OBJS = ${PALOBJS}
 
 # Any extra defines we want available to all homebrew programs.
 EXTRA_DEFINES = -DSERIAL=\"${SERIAL}\" -DBUILD_DATE=$(shell ${DATE}) -DSTART_ADDR=${START_ADDR} ${FLAGS}
