@@ -1,13 +1,7 @@
 # Please see the README for setting up a valid build environment.
 
-# Commands
-MKDIR 		:= mkdir
-
-# Output files
-BIN 		:= palettetest.bin
-
-# All targets to Make
-all: $(BIN)
+# The top-level binary that you wish to produce.
+all: palettetest.bin
 
 # All of the source files (.c and .s) that you want to compile.
 # You can use relative directories here as well. Note that if
@@ -71,7 +65,7 @@ build/pal_d.o: pal_d.txt ${PAL2C_FILE}
 
 # Provide the top-level ROM creation target for this binary.
 # See tools/makerom.py for details about what is customizable.
-$(BIN): ${MAKEROM_FILE} ${NAOMI_BIN_FILE} | $(BINDIR)
+palettetest.bin: ${MAKEROM_FILE} ${NAOMI_BIN_FILE} | $(BINDIR)
 	${MAKEROM} $@ \
 		--title "Palette Test" \
 		--publisher "Softdrink117" \
@@ -86,5 +80,4 @@ $(BIN): ${MAKEROM_FILE} ${NAOMI_BIN_FILE} | $(BINDIR)
 .PHONY: clean
 clean:
 	rm -rf build
-	rm -rf $(BIN)
-	rm -rf $(BINDIR)
+	rm -rf palettetest.bin
