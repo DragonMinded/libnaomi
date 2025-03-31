@@ -36,7 +36,7 @@ typedef struct
 font_t *font_add(void *buffer, unsigned int size);
 
 // Discard a previously loaded fontface.
-void font_disard(font_t *fontface);
+void font_discard(font_t *fontface);
 
 // Add a fallback fontface to a previously created font for rendering
 // characters that do not appear in the original font. Returns zero
