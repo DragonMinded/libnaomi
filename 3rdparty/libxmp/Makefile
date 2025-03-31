@@ -1,11 +1,11 @@
 all: build
 
 # Download arguments
-BASE_URL = https://github.com/libxmp/libxmp/archive/refs/tags
+BASE_URL = https://github.com/libxmp/libxmp/archive/refs/tags/
 
-NAME = libxmp-xmp-4.0.6
+NAME = libxmp-libxmp-4.6.2
 
-ARTIFACT = xmp-4.0.6.zip
+ARTIFACT = libxmp-4.6.2.tar.gz
 
 # Build arguments
 USES_AUTOCONF = 1
