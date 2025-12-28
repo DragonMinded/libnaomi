@@ -174,7 +174,7 @@ $(build_gcc_pass2): logdir
 
 gdb-$(gdb_ver).tar.gz:
 	@echo "+++ Downloading GDB..."
-	wget -c ftp://ftp.gnu.org/gnu/gdb/gdb-$(gdb_ver).tar.gz
+	curl -O -C - ftp://ftp.gnu.org/gnu/gdb/gdb-$(gdb_ver).tar.gz
 
 unpack_gdb: gdb-$(gdb_ver).tar.gz unpack_gdb_stamp
 
@@ -219,7 +219,7 @@ gdb: install_gdb
 
 insight-$(insight_ver)a.tar.bz2:
 	@echo "+++ Downloading Insight..."
-	wget -c ftp://sourceware.org/pub/insight/releases/insight-$(insight_ver)a.tar.bz2
+	curl -O -C - ftp://sourceware.org/pub/insight/releases/insight-$(insight_ver)a.tar.bz2
 
 unpack_insight: insight-$(insight_ver)a.tar.bz2 unpack_insight_stamp
 
