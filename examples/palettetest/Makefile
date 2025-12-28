@@ -22,7 +22,7 @@ SRCS += pal_d.txt
 LIBS += -lnaomisprite
 
 # Pick up base makefile rules so we don't have to do it by hand.
-include ${NAOMI_BASE}/tools/Makefile.base
+include ../../Makefile.base
 
 # Specific buildrule for PNG files for this project.
 
